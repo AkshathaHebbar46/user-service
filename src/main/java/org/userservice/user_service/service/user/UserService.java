@@ -98,15 +98,18 @@ public class UserService {
         logger.info("User deleted successfully with id={}", userId);
     }
 
-    public List<WalletResponseDTO> getUserWallets(Long userId) {
+    public List<WalletResponseDTO> getUserWallets(String authHeader, Long userId) {
         String url = "http://localhost:8082/wallets/user/" + userId;
 
+        // Synchronous call using RestClient
         WalletResponseDTO[] wallets = restClient.get()
                 .uri(url)
+                .header("Authorization", authHeader) // pass JWT token
                 .retrieve()
-                .body(WalletResponseDTO[].class); // <-- correct way for RestClient
+                .body(WalletResponseDTO[].class);  // <-- correct method
 
         return Arrays.asList(wallets);
     }
+
 
 }

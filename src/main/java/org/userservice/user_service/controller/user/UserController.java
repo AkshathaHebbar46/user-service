@@ -66,9 +66,13 @@ public class UserController {
     }
 
     @GetMapping("/{userId}/wallets")
-    public ResponseEntity<List<WalletResponseDTO>> getUserWallets(@PathVariable Long userId) {
-        List<WalletResponseDTO> wallets = userService.getUserWallets(userId);
+    public ResponseEntity<List<WalletResponseDTO>> getUserWallets(
+            @PathVariable Long userId,
+            @RequestHeader("Authorization") String authHeader) {
+
+        List<WalletResponseDTO> wallets = userService.getUserWallets(authHeader, userId);
         return ResponseEntity.ok(wallets);
     }
+
 
 }
