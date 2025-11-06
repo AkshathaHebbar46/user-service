@@ -1,13 +1,14 @@
-package org.userservice.user_service.controller;
+package org.userservice.user_service.controller.user;
 
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.userservice.user_service.dto.request.UserRequestDTO;
-import org.userservice.user_service.dto.response.UserResponseDTO;
-import org.userservice.user_service.service.UserService;
+import org.userservice.user_service.dto.request.user.UserRequestDTO;
+import org.userservice.user_service.dto.response.user.UserResponseDTO;
+import org.userservice.user_service.dto.response.wallet.WalletResponseDTO;
+import org.userservice.user_service.service.user.UserService;
 import java.util.List;
 
 @RestController
@@ -63,4 +64,11 @@ public class UserController {
         userService.deleteUser(userId);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/{userId}/wallets")
+    public ResponseEntity<List<WalletResponseDTO>> getUserWallets(@PathVariable Long userId) {
+        List<WalletResponseDTO> wallets = userService.getUserWallets(userId);
+        return ResponseEntity.ok(wallets);
+    }
+
 }

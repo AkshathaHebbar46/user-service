@@ -19,7 +19,6 @@ public class UserEntity {
 
     @Column(nullable = false, length = 100)
     @NotBlank(message = "Password is required")
-    @Size(min = 8, max = 20, message = "Password must be between 8 and 20 characters")
     private String password;
 
     @NotBlank(message = "Email is required")
@@ -31,6 +30,9 @@ public class UserEntity {
     @Min(value = 18, message = "Age must be at least 18")
     @Max(value = 120, message = "Age cannot exceed 100")
     private Integer age;
+
+    @Enumerated(EnumType.STRING)
+    private Role role;
 
     @CreationTimestamp
     @Column(updatable = false, nullable = false)
@@ -67,6 +69,14 @@ public class UserEntity {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
     }
 
     public String getPassword() {

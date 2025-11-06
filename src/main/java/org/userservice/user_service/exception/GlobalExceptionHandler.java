@@ -7,43 +7,33 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.ResourceAccessException;
-import org.userservice.user_service.dto.response.ErrorResponseDTO;
+import org.userservice.user_service.dto.response.error.ErrorResponseDTO;
 
 import java.time.LocalDateTime;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    //  Validation errors (e.g. invalid age, empty email, etc.)
+    // Handle validation errors (e.g., invalid age, missing fields)
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponseDTO> handleValidationErrors(MethodArgumentNotValidException ex) {
-        String message = ex.getBindingResult().getFieldErrors().stream()
-                .map(e -> e.getDefaultMessage())
-                .findFirst()
-                .orElse("Invalid input");
+    public ResponseEntity<ErrorResponseDTO> handleValidationExceptions(MethodArgumentNotValidException ex) {
+        String errors = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .collect(Collectors.joining(", "));
 
-        ErrorResponseDTO error = ErrorResponseDTO.of(
+        ErrorResponseDTO errorResponse = ErrorResponseDTO.of(
                 HttpStatus.BAD_REQUEST.value(),
                 "Validation Error",
-                message
+                errors
         );
 
-        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }
 
-    // Wallet service call failed (REST client failure)
-    @ExceptionHandler(WalletServiceException.class)
-    public ResponseEntity<ErrorResponseDTO> handleWalletServiceError(WalletServiceException ex) {
-        ErrorResponseDTO error = ErrorResponseDTO.of(
-                HttpStatus.SERVICE_UNAVAILABLE.value(),
-                "Wallet Service Error",
-                ex.getMessage()
-        );
-
-        return new ResponseEntity<>(error, HttpStatus.SERVICE_UNAVAILABLE);
-    }
-
-    // Handle duplicate email or DB constraint violations
+    // Handle database constraint violations (e.g., duplicate email)
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponseDTO> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         String message = "Duplicate entry or constraint violation";
@@ -62,6 +52,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 
+    // Handle Wallet Service REST client failures
+    @ExceptionHandler(WalletServiceException.class)
+    public ResponseEntity<ErrorResponseDTO> handleWalletServiceError(WalletServiceException ex) {
+        ErrorResponseDTO error = ErrorResponseDTO.of(
+                HttpStatus.SERVICE_UNAVAILABLE.value(),
+                "Wallet Service Error",
+                ex.getMessage()
+        );
+
+        return new ResponseEntity<>(error, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    // Handle external service unavailability
     @ExceptionHandler(ResourceAccessException.class)
     public ResponseEntity<ErrorResponseDTO> handleServiceUnavailable(ResourceAccessException ex) {
         ErrorResponseDTO error = new ErrorResponseDTO(
@@ -73,7 +76,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error);
     }
 
-    //  Fallback for unexpected exceptions
+    // Fallback for unexpected exceptions
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponseDTO> handleGeneric(Exception ex) {
         ErrorResponseDTO error = ErrorResponseDTO.of(

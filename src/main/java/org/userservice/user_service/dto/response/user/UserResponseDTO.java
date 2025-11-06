@@ -1,4 +1,4 @@
-package org.userservice.user_service.dto.response;
+package org.userservice.user_service.dto.response.user;
 
 import java.time.LocalDateTime;
 
