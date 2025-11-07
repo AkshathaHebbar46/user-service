@@ -12,6 +12,7 @@ import org.springframework.security.crypto.bcrypt.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.*;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.userservice.user_service.exception.SecurityExceptionHandler;
 import org.userservice.user_service.service.user_details.CustomUserDetailsService;
 
 @Configuration
@@ -21,12 +22,16 @@ public class SecurityConfig {
 
     private final CustomUserDetailsService userDetailsService;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final SecurityExceptionHandler securityExceptionHandler;
 
     public SecurityConfig(CustomUserDetailsService userDetailsService,
-                          JwtAuthenticationFilter jwtAuthenticationFilter) {
+                          JwtAuthenticationFilter jwtAuthenticationFilter,
+                          SecurityExceptionHandler securityExceptionHandler) {
         this.userDetailsService = userDetailsService;
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.securityExceptionHandler = securityExceptionHandler;
     }
+
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
         return authConfig.getAuthenticationManager();
@@ -41,8 +46,12 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(securityExceptionHandler) // Handles 401
+                        .accessDeniedHandler(securityExceptionHandler)       // Handles 403
+                )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()   // allow register/login
+                        .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -51,5 +60,4 @@ public class SecurityConfig {
 
         return http.build();
     }
-
 }
