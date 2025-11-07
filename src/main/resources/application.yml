@@ -1,6 +1,7 @@
 spring:
   application:
     name: user-service
+
   datasource:
     url: jdbc:mysql://localhost:3307/user_db?createDatabaseIfNotExist=true
     username: root
@@ -24,4 +25,3 @@ jwt:
 service:
   wallet:
     base-url: http://localhost:8082/wallets
-

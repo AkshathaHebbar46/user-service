@@ -1,4 +1,4 @@
-package org.userservice.user_service.service.user;
+package org.userservice.user_service.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

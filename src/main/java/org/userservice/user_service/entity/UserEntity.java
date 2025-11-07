@@ -9,29 +9,33 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "users")
 public class UserEntity {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @NotBlank(message = "Name is required")
     @Size(min = 2, max = 50, message = "Name must be between 2 and 50 characters")
+    @Column(nullable = false, length = 50)
     private String username;
 
-    @Column(nullable = false, length = 100)
     @NotBlank(message = "Password is required")
+    @Column(nullable = false, length = 100)
     private String password;
 
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
-    @Column(unique = true, nullable = false)
+    @Column(unique = true, nullable = false, length = 100)
     private String email;
 
     @NotNull(message = "Age is required")
     @Min(value = 18, message = "Age must be at least 18")
-    @Max(value = 120, message = "Age cannot exceed 100")
+    @Max(value = 120, message = "Age cannot exceed 120")
+    @Column(nullable = false)
     private Integer age;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private Role role;
 
     @CreationTimestamp

@@ -9,7 +9,7 @@ import org.userservice.user_service.dto.request.user.UserRequestDTO;
 import org.userservice.user_service.dto.response.user.UserResponseDTO;
 import org.userservice.user_service.dto.response.wallet.WalletResponseDTO;
 import org.userservice.user_service.validator.AuthValidator;
-import org.userservice.user_service.service.user.UserService;
+import org.userservice.user_service.service.UserService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
