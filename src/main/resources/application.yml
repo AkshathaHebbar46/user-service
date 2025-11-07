@@ -17,10 +17,11 @@ spring:
 server:
   port: 8081
 
-wallet:
-  service:
-    url: http://localhost:8082
-
 jwt:
   secret: MySuperSuperSecretKeyThatIsLongEnough1234
   expiration: 3600000
+
+service:
+  wallet:
+    base-url: http://localhost:8082/wallets
+

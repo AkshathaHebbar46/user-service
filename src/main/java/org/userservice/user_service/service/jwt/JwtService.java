@@ -4,6 +4,7 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
 import java.security.Key;
 import java.util.Date;
 
@@ -40,5 +41,16 @@ public class JwtService {
 
     public String extractEmail(String token) {
         return validateToken(token).getBody().getSubject();
+    }
+
+    // ✅ Add these helper methods
+    public Long extractUserId(String token) {
+        Claims claims = validateToken(token).getBody();
+        return claims.get("userId", Long.class);
+    }
+
+    public String extractRole(String token) {
+        Claims claims = validateToken(token).getBody();
+        return claims.get("role", String.class);
     }
 }

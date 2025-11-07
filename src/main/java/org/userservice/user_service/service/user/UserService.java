@@ -5,13 +5,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClient;
+import org.userservice.user_service.properties.WalletServiceProperties;
 import org.userservice.user_service.dto.request.user.UserRequestDTO;
 import org.userservice.user_service.dto.response.user.UserResponseDTO;
 import org.userservice.user_service.dto.response.wallet.WalletResponseDTO;
 import org.userservice.user_service.entity.UserEntity;
 import org.userservice.user_service.mapper.UserMapper;
 import org.userservice.user_service.repository.UserRepository;
-import org.springframework.web.client.RestClient;
 
 import java.util.Arrays;
 import java.util.List;
@@ -25,29 +26,30 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
-    private final RestClient restClient; // Modern RestClient
+    private final RestClient restClient;
+    private final WalletServiceProperties walletProperties;
 
     public UserService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
                        UserMapper userMapper,
-                       RestClient restClient) {
+                       RestClient restClient,
+                       WalletServiceProperties walletProperties) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.userMapper = userMapper;
         this.restClient = restClient;
+        this.walletProperties = walletProperties;
     }
 
     @Transactional
     public UserResponseDTO createUser(UserRequestDTO request) {
-        // 1️⃣ Save user
         UserEntity entity = userMapper.toEntity(request);
         entity.setPassword(passwordEncoder.encode(request.password()));
         userRepository.save(entity);
         logger.info("User created successfully with id={}", entity.getId());
 
-        // 2️⃣ Call Wallet Service
         try {
-            String walletServiceUrl = "http://localhost:8082/wallets";
+            String walletServiceUrl = walletProperties.getBaseUrl();
             Map<String, Object> walletRequest = Map.of(
                     "userId", entity.getId(),
                     "username", entity.getUsername()
@@ -99,17 +101,14 @@ public class UserService {
     }
 
     public List<WalletResponseDTO> getUserWallets(String authHeader, Long userId) {
-        String url = "http://localhost:8082/wallets/user/" + userId;
+        String url = walletProperties.getBaseUrl() + "/user/" + userId;
 
-        // Synchronous call using RestClient
         WalletResponseDTO[] wallets = restClient.get()
                 .uri(url)
-                .header("Authorization", authHeader) // pass JWT token
+                .header("Authorization", authHeader)
                 .retrieve()
-                .body(WalletResponseDTO[].class);  // <-- correct method
+                .body(WalletResponseDTO[].class);
 
         return Arrays.asList(wallets);
     }
-
-
 }
