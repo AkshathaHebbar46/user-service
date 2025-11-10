@@ -5,7 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestClient;
+import org.springframework.web.reactive.function.client.WebClient;
 import org.userservice.user_service.properties.WalletServiceProperties;
 import org.userservice.user_service.dto.request.user.UserRequestDTO;
 import org.userservice.user_service.dto.response.user.UserResponseDTO;
@@ -26,48 +26,62 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
-    private final RestClient restClient;
+    private final WebClient webClient;
     private final WalletServiceProperties walletProperties;
 
     public UserService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
                        UserMapper userMapper,
-                       RestClient restClient,
+                       WebClient webClient,
                        WalletServiceProperties walletProperties) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.userMapper = userMapper;
-        this.restClient = restClient;
+        this.webClient = webClient;
         this.walletProperties = walletProperties;
     }
 
     @Transactional
     public UserResponseDTO createUser(UserRequestDTO request) {
+        // 1️⃣ Save the user
         UserEntity entity = userMapper.toEntity(request);
         entity.setPassword(passwordEncoder.encode(request.password()));
         userRepository.save(entity);
         logger.info("User created successfully with id={}", entity.getId());
 
+        // 2️⃣ Automatically create wallet
         try {
-            String walletServiceUrl = walletProperties.getBaseUrl();
+            String walletServiceUrl = walletProperties.getBaseUrl() + "/wallets";
+
             Map<String, Object> walletRequest = Map.of(
                     "userId", entity.getId(),
                     "username", entity.getUsername()
             );
 
-            restClient.post()
+            WalletResponseDTO walletResponse = webClient.post()
                     .uri(walletServiceUrl)
-                    .body(walletRequest)
+                    .bodyValue(walletRequest)
                     .retrieve()
-                    .toBodilessEntity();
+                    .onStatus(
+                            status -> !status.is2xxSuccessful(),
+                            clientResponse -> clientResponse.bodyToMono(String.class)
+                                    .map(body -> new RuntimeException("Wallet service error: " + body))
+                    )
+                    .bodyToMono(WalletResponseDTO.class)
+                    .block(); // must block to execute before returning user
 
-            logger.info("Wallet created for user id={}", entity.getId());
+            if (walletResponse != null) {
+                logger.info("Wallet created automatically: walletId={}, userId={}",
+                        walletResponse.getWalletId(), walletResponse.getUserId());
+            }
         } catch (Exception e) {
-            logger.error("Failed to create wallet for user id={}: {}", entity.getId(), e.getMessage());
+            logger.error("Failed to create wallet for user {}: {}", entity.getId(), e.getMessage(), e);
         }
 
+        // 3️⃣ Return user DTO
         return userMapper.toDTO(entity);
     }
+
 
     public List<UserResponseDTO> getAllUsers() {
         return userRepository.findAll().stream()
@@ -103,11 +117,12 @@ public class UserService {
     public List<WalletResponseDTO> getUserWallets(String authHeader, Long userId) {
         String url = walletProperties.getBaseUrl() + "/user/" + userId;
 
-        WalletResponseDTO[] wallets = restClient.get()
+        WalletResponseDTO[] wallets = webClient.get()
                 .uri(url)
                 .header("Authorization", authHeader)
                 .retrieve()
-                .body(WalletResponseDTO[].class);
+                .bodyToMono(WalletResponseDTO[].class)
+                .block(); // synchronous call
 
         return Arrays.asList(wallets);
     }
