@@ -43,44 +43,15 @@ public class UserService {
 
     @Transactional
     public UserResponseDTO createUser(UserRequestDTO request) {
-        // 1️⃣ Save the user
+        // 1️⃣ Save user
         UserEntity entity = userMapper.toEntity(request);
         entity.setPassword(passwordEncoder.encode(request.password()));
         userRepository.save(entity);
         logger.info("User created successfully with id={}", entity.getId());
-
-        // 2️⃣ Automatically create wallet
-        try {
-            String walletServiceUrl = walletProperties.getBaseUrl() + "/wallets";
-
-            Map<String, Object> walletRequest = Map.of(
-                    "userId", entity.getId(),
-                    "username", entity.getUsername()
-            );
-
-            WalletResponseDTO walletResponse = webClient.post()
-                    .uri(walletServiceUrl)
-                    .bodyValue(walletRequest)
-                    .retrieve()
-                    .onStatus(
-                            status -> !status.is2xxSuccessful(),
-                            clientResponse -> clientResponse.bodyToMono(String.class)
-                                    .map(body -> new RuntimeException("Wallet service error: " + body))
-                    )
-                    .bodyToMono(WalletResponseDTO.class)
-                    .block(); // must block to execute before returning user
-
-            if (walletResponse != null) {
-                logger.info("Wallet created automatically: walletId={}, userId={}",
-                        walletResponse.getWalletId(), walletResponse.getUserId());
-            }
-        } catch (Exception e) {
-            logger.error("Failed to create wallet for user {}: {}", entity.getId(), e.getMessage(), e);
-        }
-
         // 3️⃣ Return user DTO
         return userMapper.toDTO(entity);
     }
+
 
 
     public List<UserResponseDTO> getAllUsers() {
