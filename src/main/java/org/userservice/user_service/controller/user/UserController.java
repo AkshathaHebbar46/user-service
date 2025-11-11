@@ -35,16 +35,6 @@ public class UserController {
         return ResponseEntity.status(201).body(response);
     }
 
-    @GetMapping
-    public ResponseEntity<List<UserResponseDTO>> getAllUsers(HttpServletRequest request) {
-        String token = authValidator.extractToken(request);
-        if (!authValidator.isAdmin(token)) {
-            return ResponseEntity.status(403).build();
-        }
-        logger.info("Admin fetching all users");
-        return ResponseEntity.ok(userService.getAllUsers());
-    }
-
     @GetMapping("/{userId}")
     public ResponseEntity<UserResponseDTO> getUser(@PathVariable Long userId, HttpServletRequest request) {
         if (!authValidator.isAuthorized(request, userId)) {

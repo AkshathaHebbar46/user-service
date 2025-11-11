@@ -42,6 +42,17 @@ public class UserEntity {
     @Column(updatable = false, nullable = false)
     private LocalDateTime createdAt;
 
+    public Boolean getActive() {
+        return active;
+    }
+
+    public void setActive(Boolean active) {
+        this.active = active;
+    }
+
+    @Column(nullable = false)
+    private Boolean active = true;
+
 
     public Long getId() {
         return id;
