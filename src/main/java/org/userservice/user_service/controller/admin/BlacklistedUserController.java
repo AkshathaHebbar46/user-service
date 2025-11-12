@@ -1,4 +1,4 @@
-package org.userservice.user_service.controller.admin.blacklist;
+package org.userservice.user_service.controller.admin;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,17 +24,5 @@ public class BlacklistedUserController {
     public ResponseEntity<String> unblockUser(@PathVariable Long userId) {
         blacklistedUserService.unblockUser(userId);
         return ResponseEntity.ok("User " + userId + " and all wallets unblocked.");
-    }
-
-    @PostMapping("/wallet/{walletId}")
-    public ResponseEntity<String> blacklistWallet(@PathVariable Long walletId) {
-        blacklistedUserService.blacklistWallet(walletId);
-        return ResponseEntity.ok("Wallet " + walletId + " blacklisted.");
-    }
-
-    @PostMapping("/wallet/{walletId}/unblock")
-    public ResponseEntity<String> unblockWallet(@PathVariable Long walletId) {
-        blacklistedUserService.unblockWallet(walletId);
-        return ResponseEntity.ok("Wallet " + walletId + " unblocked.");
     }
 }

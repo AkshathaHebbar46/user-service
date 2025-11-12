@@ -1,5 +1,7 @@
 package org.userservice.user_service.service.jwt;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.userservice.user_service.config.JwtUtil;
@@ -33,4 +35,5 @@ public class JwtService {
         final String email = extractEmail(token);
         return email.equals(userDetails.getUsername()) && jwtUtil.validateToken(token);
     }
+
 }

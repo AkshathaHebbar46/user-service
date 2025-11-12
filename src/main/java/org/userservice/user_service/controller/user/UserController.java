@@ -7,7 +7,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.userservice.user_service.dto.request.user.UserRequestDTO;
 import org.userservice.user_service.dto.response.user.UserResponseDTO;
-import org.userservice.user_service.dto.response.wallet.WalletResponseDTO;
 import org.userservice.user_service.validator.AuthValidator;
 import org.userservice.user_service.service.UserService;
 
@@ -65,19 +64,5 @@ public class UserController {
         logger.info("Deleting user with id={}", userId);
         userService.deleteUser(userId);
         return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/{userId}/wallets")
-    public ResponseEntity<List<WalletResponseDTO>> getUserWallets(
-            @PathVariable Long userId,
-            HttpServletRequest request) {
-
-        if (!authValidator.isAuthorized(request, userId)) {
-            return ResponseEntity.status(403).build();
-        }
-        logger.info("Fetching wallets for user id={}", userId);
-        String token = authValidator.extractToken(request);
-        List<WalletResponseDTO> wallets = userService.getUserWallets("Bearer " + token, userId);
-        return ResponseEntity.ok(wallets);
     }
 }

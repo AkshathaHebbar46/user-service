@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.*;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.*;
 import org.springframework.stereotype.Component;
@@ -16,6 +17,9 @@ import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -57,6 +61,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String email = jwtService.extractEmail(token);
             UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+
+            String role = jwtService.extractRole(token);
+            List<SimpleGrantedAuthority> authorities =
+                    Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
 
             if (!jwtService.isTokenValid(token, userDetails)) {
                 securityExceptionHandler.commence(request, response,

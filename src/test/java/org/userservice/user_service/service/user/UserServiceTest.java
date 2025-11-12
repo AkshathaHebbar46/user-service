@@ -57,30 +57,37 @@ class UserServiceTest {
 
     // ✅ CREATE USER - SUCCESS
     @Test
-    void testCreateUser_Success() {
-        when(userMapper.toEntity(userRequest)).thenReturn(userEntity);
-        when(passwordEncoder.encode("password123")).thenReturn("encoded");
-        when(walletProperties.getBaseUrl()).thenReturn("http://wallet-service/wallets");
-        when(userMapper.toDTO(userEntity)).thenReturn(userResponse);
-        when(userRepository.save(any())).thenReturn(userEntity);
+    void testCreateUser_Success() throws Exception {
+        UserRequestDTO request = new UserRequestDTO(
+                "JohnDoe",
+                "john@example.com",
+                "password123",
+                25
+        );
 
-        RestClient.RequestBodyUriSpec mockRequest = mock(RestClient.RequestBodyUriSpec.class);
-        RestClient.RequestBodySpec mockBody = mock(RestClient.RequestBodySpec.class);
-        RestClient.ResponseSpec mockResponse = mock(RestClient.ResponseSpec.class);
+        UserEntity entity = new UserEntity();
+        entity.setId(1L);
+        entity.setUsername("JohnDoe");
+        entity.setEmail("john@example.com");
+        entity.setAge(25);
 
-        when(restClient.post()).thenReturn(mockRequest);
-        when(mockRequest.uri(anyString())).thenReturn(mockBody);
-        when(mockBody.body(any(Map.class))).thenReturn(mockBody);
-        when(mockBody.retrieve()).thenReturn(mockResponse);
-        when(mockResponse.toBodilessEntity()).thenReturn(null);
+        when(userMapper.toEntity(any(UserRequestDTO.class))).thenReturn(entity);
+        when(passwordEncoder.encode(anyString())).thenReturn("encodedPassword");
+        when(userMapper.toDTO(any(UserEntity.class))).thenReturn(
+                new UserResponseDTO(1L, "JohnDoe", "john@example.com", 25, LocalDateTime.now())
+        );
 
-        UserResponseDTO result = userService.createUser(userRequest);
+        UserResponseDTO response = userService.createUser(request);
 
-        assertNotNull(result);
-        assertEquals("Akshatha", result.username());
-        verify(userRepository).save(userEntity);
-        verify(restClient).post();
+        assertEquals(1L, response.id());
+        assertEquals("JohnDoe", response.username());
+
+        verify(userMapper, times(1)).toEntity(request);
+        verify(passwordEncoder, times(1)).encode("password123");
+        verify(userRepository, times(1)).save(entity);
+        verify(userMapper, times(1)).toDTO(entity);
     }
+
 
     // ✅ CREATE USER - WALLET FAILURE (should still return user)
     @Test

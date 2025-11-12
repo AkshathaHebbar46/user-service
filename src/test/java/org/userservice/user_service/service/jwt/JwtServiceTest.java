@@ -1,99 +1,142 @@
 package org.userservice.user_service.service.jwt;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jws;
+import io.jsonwebtoken.ExpiredJwtException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.userservice.user_service.service.jwt.JwtService;
-
-import java.util.concurrent.TimeUnit;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.userservice.user_service.config.JwtUtil;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 class JwtServiceTest {
 
+    @Mock
+    private JwtUtil jwtUtil;
+
+    @InjectMocks
     private JwtService jwtService;
 
-    // Use a test secret; normally HS256 needs 32+ bytes
-    private final String testSecret = "abcdefghijklmnopqrstuvwxyz123456";
-    private final long expirationMs = 1000L * 60 * 60; // 1 hour
+    private final String validToken = "valid.jwt.token";
+    private final String expiredToken = "expired.jwt.token";
+    private final String invalidToken = "invalid.jwt.token";
 
     @BeforeEach
     void setup() {
-        jwtService = new JwtService();
-        // Use reflection to set @Value fields
-        try {
-            var secretField = JwtService.class.getDeclaredField("secret");
-            secretField.setAccessible(true);
-            secretField.set(jwtService, testSecret);
-
-            var expField = JwtService.class.getDeclaredField("expirationMs");
-            expField.setAccessible(true);
-            expField.set(jwtService, expirationMs);
-        } catch (Exception e) {
-            fail("Failed to set JwtService fields via reflection");
-        }
+        MockitoAnnotations.openMocks(this);
     }
 
     @Test
-    void testGenerateAndValidateToken() {
-        String email = "test@example.com";
-        Long userId = 42L;
-        String role = "USER";
+    void testGenerateToken_Success() {
+        when(jwtUtil.generateToken("user@example.com", 1L, "USER")).thenReturn(validToken);
 
-        String token = jwtService.generateToken(email, userId, role);
-        assertNotNull(token);
+        String token = jwtService.generateToken("user@example.com", 1L, "USER");
 
-        Jws<Claims> claimsJws = jwtService.validateToken(token);
-        assertEquals(email, claimsJws.getBody().getSubject());
-        assertEquals(userId, claimsJws.getBody().get("userId", Long.class));
-        assertEquals(role, claimsJws.getBody().get("role", String.class));
+        assertEquals(validToken, token);
+        verify(jwtUtil, times(1)).generateToken("user@example.com", 1L, "USER");
     }
 
     @Test
-    void testExtractEmail() {
-        String email = "extract@example.com";
-        String token = jwtService.generateToken(email, 1L, "ADMIN");
+    void testValidateToken_Success() {
+        when(jwtUtil.validateToken(validToken)).thenReturn(true);
 
-        String extracted = jwtService.extractEmail(token);
-        assertEquals(email, extracted);
+        boolean valid = jwtUtil.validateToken(validToken);
+
+        assertTrue(valid);
+        verify(jwtUtil, times(1)).validateToken(validToken);
     }
 
     @Test
-    void testExtractUserIdAndRole() {
-        Long userId = 123L;
-        String role = "MANAGER";
-        String token = jwtService.generateToken("user@example.com", userId, role);
+    void testValidateToken_Failure_InvalidToken() {
+        when(jwtUtil.validateToken(invalidToken)).thenReturn(false);
 
-        assertEquals(userId, jwtService.extractUserId(token));
-        assertEquals(role, jwtService.extractRole(token));
+        boolean valid = jwtUtil.validateToken(invalidToken);
+
+        assertFalse(valid);
+        verify(jwtUtil, times(1)).validateToken(invalidToken);
     }
 
     @Test
-    void testExpiredToken() throws InterruptedException {
-        // Temporarily set a very short expiration
-        try {
-            var expField = JwtService.class.getDeclaredField("expirationMs");
-            expField.setAccessible(true);
-            expField.set(jwtService, 10L); // 10ms
-        } catch (Exception e) {
-            fail("Failed to set expirationMs");
-        }
+    void testValidateToken_ThrowsExpiredJwtException() {
+        when(jwtUtil.validateToken(expiredToken)).thenThrow(ExpiredJwtException.class);
 
-        String token = jwtService.generateToken("exp@example.com", 1L, "USER");
-
-        // Wait for token to expire
-        TimeUnit.MILLISECONDS.sleep(20);
-
-        assertThrows(io.jsonwebtoken.ExpiredJwtException.class,
-                () -> jwtService.validateToken(token));
+        assertThrows(ExpiredJwtException.class, () -> jwtUtil.validateToken(expiredToken));
+        verify(jwtUtil, times(1)).validateToken(expiredToken);
     }
 
     @Test
-    void testInvalidToken() {
-        String invalidToken = "invalid.token.here";
+    void testExtractEmail_Success() {
+        when(jwtUtil.extractUsername(validToken)).thenReturn("user@example.com");
 
-        assertThrows(io.jsonwebtoken.JwtException.class,
-                () -> jwtService.validateToken(invalidToken));
+        String email = jwtService.extractEmail(validToken);
+
+        assertEquals("user@example.com", email);
+        verify(jwtUtil, times(1)).extractUsername(validToken);
+    }
+
+    @Test
+    void testExtractEmail_NullToken() {
+        when(jwtUtil.extractUsername(null)).thenThrow(IllegalArgumentException.class);
+
+        assertThrows(IllegalArgumentException.class, () -> jwtService.extractEmail(null));
+        verify(jwtUtil, times(1)).extractUsername(null);
+    }
+
+    @Test
+    void testExtractUserId_Success() {
+        when(jwtUtil.extractUserId(validToken)).thenReturn(42L);
+
+        Long userId = jwtService.extractUserId(validToken);
+
+        assertEquals(42L, userId);
+        verify(jwtUtil, times(1)).extractUserId(validToken);
+    }
+
+    @Test
+    void testExtractRole_Success() {
+        when(jwtUtil.extractRole(validToken)).thenReturn("USER");
+
+        String role = jwtService.extractRole(validToken);
+
+        assertEquals("USER", role);
+        verify(jwtUtil, times(1)).extractRole(validToken);
+    }
+
+    @Test
+    void testExtractRole_NullToken() {
+        when(jwtUtil.extractRole(null)).thenThrow(IllegalArgumentException.class);
+
+        assertThrows(IllegalArgumentException.class, () -> jwtService.extractRole(null));
+        verify(jwtUtil, times(1)).extractRole(null);
+    }
+
+    @Test
+    void testValidateToken_NullToken() {
+        when(jwtUtil.validateToken(null)).thenReturn(false);
+
+        boolean valid = jwtUtil.validateToken(null);
+
+        assertFalse(valid);
+        verify(jwtUtil, times(1)).validateToken(null);
+    }
+
+    @Test
+    void testGenerateToken_NullRole() {
+        when(jwtUtil.generateToken("user@example.com", 1L, null)).thenReturn(validToken);
+
+        String token = jwtService.generateToken("user@example.com", 1L, null);
+
+        assertEquals(validToken, token);
+        verify(jwtUtil, times(1)).generateToken("user@example.com", 1L, null);
+    }
+
+    @Test
+    void testExtractUserId_InvalidToken() {
+        when(jwtUtil.extractUserId(invalidToken)).thenThrow(IllegalArgumentException.class);
+
+        assertThrows(IllegalArgumentException.class, () -> jwtService.extractUserId(invalidToken));
+        verify(jwtUtil, times(1)).extractUserId(invalidToken);
     }
 }

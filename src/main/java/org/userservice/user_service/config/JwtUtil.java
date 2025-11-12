@@ -28,6 +28,10 @@ public class JwtUtil {
         this.key = Keys.hmacShaKeyFor(secret.getBytes());
     }
 
+    public SecretKey getKey() {
+        return key;
+    }
+
     // Generate token with email, userId, and optional role
     public String generateToken(String email, Long userId, String role) {
         JwtBuilder builder = Jwts.builder()

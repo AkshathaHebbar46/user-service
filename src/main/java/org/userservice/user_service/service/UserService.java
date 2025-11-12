@@ -9,7 +9,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.userservice.user_service.properties.WalletServiceProperties;
 import org.userservice.user_service.dto.request.user.UserRequestDTO;
 import org.userservice.user_service.dto.response.user.UserResponseDTO;
-import org.userservice.user_service.dto.response.wallet.WalletResponseDTO;
 import org.userservice.user_service.entity.UserEntity;
 import org.userservice.user_service.mapper.UserMapper;
 import org.userservice.user_service.repository.UserRepository;
@@ -52,8 +51,6 @@ public class UserService {
         return userMapper.toDTO(entity);
     }
 
-
-
     public List<UserResponseDTO> getAllUsers() {
         return userRepository.findAll().stream()
                 .map(userMapper::toDTO)
@@ -85,16 +82,4 @@ public class UserService {
         logger.info("User deleted successfully with id={}", userId);
     }
 
-    public List<WalletResponseDTO> getUserWallets(String authHeader, Long userId) {
-        String url = walletProperties.getBaseUrl() + "/user/" + userId;
-
-        WalletResponseDTO[] wallets = webClient.get()
-                .uri(url)
-                .header("Authorization", authHeader)
-                .retrieve()
-                .bodyToMono(WalletResponseDTO[].class)
-                .block(); // synchronous call
-
-        return Arrays.asList(wallets);
-    }
 }
