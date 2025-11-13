@@ -26,8 +26,3 @@ service:
   wallet:
     base-url: http://localhost:8082/wallets
 
-logging:
-  level:
-    org:
-      springframework:
-        security=DEBUG:

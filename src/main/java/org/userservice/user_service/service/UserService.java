@@ -2,10 +2,13 @@ package org.userservice.user_service.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.userservice.user_service.dto.request.user.UserPatchRequestDTO;
+import org.userservice.user_service.dto.request.user.UserUpdateRequestDTO;
 import org.userservice.user_service.properties.WalletServiceProperties;
 import org.userservice.user_service.dto.request.user.UserRequestDTO;
 import org.userservice.user_service.dto.response.user.UserResponseDTO;
@@ -13,9 +16,7 @@ import org.userservice.user_service.entity.UserEntity;
 import org.userservice.user_service.mapper.UserMapper;
 import org.userservice.user_service.repository.UserRepository;
 
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 @Service
 public class UserService {
@@ -38,48 +39,125 @@ public class UserService {
         this.userMapper = userMapper;
         this.webClient = webClient;
         this.walletProperties = walletProperties;
+        logger.info("UserService initialized");
+    }
+
+    private UserEntity getCurrentAuthenticatedUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        logger.debug("Fetching currently authenticated user by email={}", email);
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> {
+                    logger.error("Authenticated user not found with email={}", email);
+                    return new IllegalArgumentException("Authenticated user not found");
+                });
     }
 
     @Transactional
     public UserResponseDTO createUser(UserRequestDTO request) {
-        // 1️⃣ Save user
+        logger.info("Creating user with username={}", request.username());
         UserEntity entity = userMapper.toEntity(request);
         entity.setPassword(passwordEncoder.encode(request.password()));
         userRepository.save(entity);
         logger.info("User created successfully with id={}", entity.getId());
-        // 3️⃣ Return user DTO
         return userMapper.toDTO(entity);
     }
 
     public List<UserResponseDTO> getAllUsers() {
+        logger.info("Fetching all users");
         return userRepository.findAll().stream()
                 .map(userMapper::toDTO)
                 .toList();
     }
 
     public UserResponseDTO getUserById(Long userId) {
+        logger.info("Fetching user by id={}", userId);
         UserEntity user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> {
+                    logger.error("User not found with id={}", userId);
+                    return new IllegalArgumentException("User not found");
+                });
         return userMapper.toDTO(user);
     }
 
     @Transactional
-    public UserResponseDTO updateUser(Long userId, UserRequestDTO request) {
+    public UserResponseDTO patchUpdateUser(Long userId, UserPatchRequestDTO dto) {
+        logger.info("Patching user with id={}", userId);
         UserEntity user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        user.setUsername(request.username());
-        user.setEmail(request.email());
-        user.setAge(request.age());
+                .orElseThrow(() -> {
+                    logger.error("User not found with id={}", userId);
+                    return new IllegalArgumentException("User not found");
+                });
+        if (dto.username() != null && !dto.username().isBlank()) {
+            logger.debug("Updating username to {}", dto.username());
+            user.setUsername(dto.username());
+        }
+        if (dto.password() != null && !dto.password().isBlank()) {
+            logger.debug("Updating password for user id={}", userId);
+            user.setPassword(passwordEncoder.encode(dto.password()));
+        }
+        if (dto.age() != null) {
+            logger.debug("Updating age to {}", dto.age());
+            user.setAge(dto.age());
+        }
         userRepository.save(user);
-        logger.info("User updated successfully with id={}", userId);
-
+        logger.info("User patched successfully with id={}", userId);
         return userMapper.toDTO(user);
     }
 
+    @Transactional
     public void deleteUser(Long userId) {
-        userRepository.deleteById(userId);
-        logger.info("User deleted successfully with id={}", userId);
+        UserEntity currentUser = getCurrentAuthenticatedUser();
+        if (!currentUser.getId().equals(userId)) {
+            logger.warn("User id={} attempted to delete another account", currentUser.getId());
+            throw new SecurityException("You can only delete your own account");
+        }
+        currentUser.setActive(false);
+        userRepository.save(currentUser);
+        logger.info("User deactivated their account with id={}", userId);
     }
 
+    public UserResponseDTO updateUserByAdmin(Long userId, UserUpdateRequestDTO dto) {
+        logger.info("Admin updating user with id={}", userId);
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    logger.error("User not found with id={}", userId);
+                    return new IllegalArgumentException("User not found");
+                });
+
+        if (dto.getName() != null) {
+            logger.debug("Updating username to {}", dto.getName());
+            user.setUsername(dto.getName());
+        }
+        if (dto.getEmail() != null) {
+            logger.debug("Updating email to {}", dto.getEmail());
+            user.setEmail(dto.getEmail());
+        }
+        if (dto.getAge() != null) {
+            logger.debug("Updating age to {}", dto.getAge());
+            user.setAge(dto.getAge());
+        }
+
+        UserEntity updated = userRepository.save(user);
+        logger.info("Admin updated user successfully with id={}", userId);
+
+        return new UserResponseDTO(
+                updated.getId(),
+                updated.getUsername(),
+                updated.getEmail(),
+                updated.getAge(),
+                updated.getCreatedAt()
+        );
+    }
+
+    @Transactional
+    public void deleteUserByAdmin(Long userId) {
+        logger.warn("Admin deleting user with id={}", userId);
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    logger.error("User not found with id={}", userId);
+                    return new IllegalArgumentException("User not found");
+                });
+        userRepository.delete(user);
+        logger.warn("Admin deleted user successfully with id={}", userId);
+    }
 }

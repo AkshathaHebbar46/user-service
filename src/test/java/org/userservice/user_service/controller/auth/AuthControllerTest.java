@@ -19,11 +19,12 @@ import org.userservice.user_service.entity.UserEntity;
 import org.userservice.user_service.repository.UserRepository;
 import org.userservice.user_service.service.jwt.JwtService;
 import org.userservice.user_service.service.user_details.CustomUserDetailsService;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.userservice.user_service.exception.GlobalExceptionHandler;
 
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -57,8 +58,13 @@ class AuthControllerTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        mockMvc = MockMvcBuilders.standaloneSetup(authController).build();
 
+        // Attach GlobalExceptionHandler to MockMvc
+        mockMvc = MockMvcBuilders.standaloneSetup(authController)
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
+
+        // Sample requests
         registerRequest = new RegisterRequestDTO();
         registerRequest.setName("John Doe");
         registerRequest.setEmail("john@example.com");
@@ -69,6 +75,7 @@ class AuthControllerTest {
         loginRequest.setEmail("john@example.com");
         loginRequest.setPassword("password");
 
+        // Sample users
         activeUser = new UserEntity();
         activeUser.setId(1L);
         activeUser.setUsername("John Doe");
@@ -113,7 +120,8 @@ class AuthControllerTest {
 
     @Test
     void login_ShouldReturnForbidden_WhenUserInactive() throws Exception {
-        when(authenticationManager.authenticate(any(Authentication.class))).thenReturn(new UsernamePasswordAuthenticationToken("jane@example.com", "password"));
+        when(authenticationManager.authenticate(any(Authentication.class)))
+                .thenReturn(new UsernamePasswordAuthenticationToken("jane@example.com", "password"));
         when(userRepository.findByEmail("jane@example.com")).thenReturn(Optional.of(inactiveUser));
 
         AuthRequestDTO inactiveLoginRequest = new AuthRequestDTO();
@@ -129,7 +137,8 @@ class AuthControllerTest {
 
     @Test
     void login_ShouldReturnToken_WhenUserActive() throws Exception {
-        when(authenticationManager.authenticate(any(Authentication.class))).thenReturn(new UsernamePasswordAuthenticationToken("john@example.com", "password"));
+        when(authenticationManager.authenticate(any(Authentication.class)))
+                .thenReturn(new UsernamePasswordAuthenticationToken("john@example.com", "password"));
         when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.of(activeUser));
         when(jwtService.generateToken(activeUser.getEmail(), activeUser.getId(), activeUser.getRole().name()))
                 .thenReturn("dummy-jwt-token");
@@ -145,7 +154,8 @@ class AuthControllerTest {
 
     @Test
     void login_ShouldReturnBadRequest_WhenUserNotFound() throws Exception {
-        when(authenticationManager.authenticate(any(Authentication.class))).thenReturn(new UsernamePasswordAuthenticationToken("unknown@example.com", "password"));
+        when(authenticationManager.authenticate(any(Authentication.class)))
+                .thenReturn(new UsernamePasswordAuthenticationToken("unknown@example.com", "password"));
         when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
 
         AuthRequestDTO unknownUserRequest = new AuthRequestDTO();
@@ -156,9 +166,6 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(unknownUserRequest)))
                 .andExpect(status().isBadRequest())
-                .andExpect(result -> {
-                    assertTrue(result.getResolvedException() instanceof IllegalArgumentException);
-                    assertEquals("User not found", result.getResolvedException().getMessage());
-                });
+                .andExpect(jsonPath("$.message").value("User not found"));
     }
 }

@@ -12,13 +12,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.userservice.user_service.dto.request.user.UserRequestDTO;
 import org.userservice.user_service.dto.response.user.UserResponseDTO;
-import org.userservice.user_service.dto.response.wallet.WalletResponseDTO;
 import org.userservice.user_service.exception.GlobalExceptionHandler;
 import org.userservice.user_service.service.UserService;
 import org.userservice.user_service.validator.AuthValidator;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -44,7 +42,7 @@ class UserControllerTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         mockMvc = MockMvcBuilders.standaloneSetup(userController)
-                .setControllerAdvice(new GlobalExceptionHandler()) // attach global exception handler
+                .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
         objectMapper = new ObjectMapper();
     }
@@ -70,7 +68,6 @@ class UserControllerTest {
         verify(userService, times(1)).createUser(any(UserRequestDTO.class));
     }
 
-    // ================= CREATE USER - FAIL =================
     @Test
     void testCreateUser_ServiceThrowsException() throws Exception {
         UserRequestDTO request = new UserRequestDTO("JohnDoe", "john@example.com", "password123", 25);
@@ -86,7 +83,7 @@ class UserControllerTest {
         verify(userService, times(1)).createUser(any(UserRequestDTO.class));
     }
 
-    // ================= GET USER BY ID =================
+    // ================= GET USER =================
     @Test
     void testGetUser_Authorized() throws Exception {
         Long userId = 1L;
@@ -119,7 +116,7 @@ class UserControllerTest {
     @Test
     void testUpdateUser_Authorized() throws Exception {
         Long userId = 1L;
-        UserRequestDTO request = new UserRequestDTO("JaneDoe", "jane@example.com", "pass1234", 30);
+        UserRequestDTO request = new UserRequestDTO("JaneDoe", "jane@example.com", "password123", 30);
         UserResponseDTO response = new UserResponseDTO(userId, "JaneDoe", "jane@example.com", 30, LocalDateTime.now());
 
         when(authValidator.isAuthorized(any(HttpServletRequest.class), eq(userId))).thenReturn(true);
@@ -139,7 +136,7 @@ class UserControllerTest {
     @Test
     void testUpdateUser_NotAuthorized() throws Exception {
         Long userId = 1L;
-        UserRequestDTO request = new UserRequestDTO("JaneDoe", "jane@example.com", "pass1234", 30);
+        UserRequestDTO request = new UserRequestDTO("JaneDoe", "jane@example.com", "password123", 30);
         when(authValidator.isAuthorized(any(HttpServletRequest.class), eq(userId))).thenReturn(false);
 
         mockMvc.perform(put("/users/{userId}", userId)
@@ -171,47 +168,5 @@ class UserControllerTest {
                 .andExpect(status().isForbidden());
 
         verify(userService, never()).deleteUser(userId);
-    }
-
-    // ================= GET USER WALLETS =================
-    @Test
-    void testGetUserWallets_Authorized() throws Exception {
-        Long userId = 1L;
-        when(authValidator.isAuthorized(any(HttpServletRequest.class), eq(userId))).thenReturn(true);
-        when(authValidator.extractToken(any(HttpServletRequest.class))).thenReturn("token");
-
-        WalletResponseDTO wallet = new WalletResponseDTO(1L, 1L, 1000.0);
-        when(userService.getUserWallets(eq("Bearer token"), eq(userId))).thenReturn(List.of(wallet));
-
-        mockMvc.perform(get("/users/{userId}/wallets", userId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].walletId").value(1))
-                .andExpect(jsonPath("$[0].userId").value(1))
-                .andExpect(jsonPath("$[0].currentBalance").value(1000.0));
-
-        verify(userService, times(1)).getUserWallets(eq("Bearer token"), eq(userId));
-    }
-
-    @Test
-    void testGetUserWallets_EmptyList() throws Exception {
-        Long userId = 1L;
-        when(authValidator.isAuthorized(any(HttpServletRequest.class), eq(userId))).thenReturn(true);
-        when(authValidator.extractToken(any(HttpServletRequest.class))).thenReturn("token");
-        when(userService.getUserWallets(eq("Bearer token"), eq(userId))).thenReturn(List.of());
-
-        mockMvc.perform(get("/users/{userId}/wallets", userId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isEmpty());
-    }
-
-    @Test
-    void testGetUserWallets_NotAuthorized() throws Exception {
-        Long userId = 1L;
-        when(authValidator.isAuthorized(any(HttpServletRequest.class), eq(userId))).thenReturn(false);
-
-        mockMvc.perform(get("/users/{userId}/wallets", userId))
-                .andExpect(status().isForbidden());
-
-        verify(userService, never()).getUserWallets(anyString(), eq(userId));
     }
 }

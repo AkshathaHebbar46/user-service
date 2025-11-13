@@ -1,6 +1,8 @@
 package org.userservice.user_service.controller.auth;
 
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -21,6 +23,8 @@ import java.util.Map;
 @RequestMapping("/api/auth")
 public class AuthController {
 
+    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
+
     private final UserRepository userRepository;
     private final CustomUserDetailsService userDetailsService;
     private final JwtService jwtService;
@@ -39,6 +43,7 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<String> register(@Valid @RequestBody RegisterRequestDTO request) {
         if (userRepository.existsByEmail(request.getEmail())) {
+            logger.warn("Registration attempt failed: Email {} already registered", request.getEmail());
             return ResponseEntity.badRequest().body("Email already registered");
         }
 
@@ -50,6 +55,7 @@ public class AuthController {
         user.setRole(Role.USER);
 
         userRepository.save(user);
+        logger.info("User registered successfully: email={}, id={}", user.getEmail(), user.getId());
 
         return ResponseEntity.ok("User registered successfully");
     }
@@ -59,12 +65,14 @@ public class AuthController {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
+        logger.info("User login attempt: email={}", request.getEmail());
 
         UserEntity user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         // 🚫 Block inactive users
         if (Boolean.FALSE.equals(user.getActive())) {
+            logger.warn("Login attempt blocked for inactive/blacklisted user: email={}", user.getEmail());
             return ResponseEntity
                     .status(403)
                     .body(Map.of("error", "User account is inactive or blacklisted."));
@@ -75,6 +83,7 @@ public class AuthController {
                 user.getId(),
                 user.getRole().name()
         );
+        logger.info("User logged in successfully: email={}, id={}", user.getEmail(), user.getId());
 
         Map<String, Object> response = new HashMap<>();
         response.put("token", token);
