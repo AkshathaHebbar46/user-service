@@ -16,7 +16,7 @@ class BlacklistedUserControllerTest {
     private BlacklistedUserService blacklistedUserService;
 
     @InjectMocks
-    private BlacklistedUserController blacklistedUserController;
+    private BlacklistedController blacklistedUserController;
 
     @BeforeEach
     void setUp() {

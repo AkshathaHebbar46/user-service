@@ -2,6 +2,7 @@ package org.userservice.user_service.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import org.userservice.user_service.mapper.UserMapper;
 import org.userservice.user_service.repository.UserRepository;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class UserService {
@@ -104,18 +106,6 @@ public class UserService {
         return userMapper.toDTO(user);
     }
 
-    @Transactional
-    public void deleteUser(Long userId) {
-        UserEntity currentUser = getCurrentAuthenticatedUser();
-        if (!currentUser.getId().equals(userId)) {
-            logger.warn("User id={} attempted to delete another account", currentUser.getId());
-            throw new SecurityException("You can only delete your own account");
-        }
-        currentUser.setActive(false);
-        userRepository.save(currentUser);
-        logger.info("User deactivated their account with id={}", userId);
-    }
-
     public UserResponseDTO updateUserByAdmin(Long userId, UserUpdateRequestDTO dto) {
         logger.info("Admin updating user with id={}", userId);
         UserEntity user = userRepository.findById(userId)
@@ -150,14 +140,34 @@ public class UserService {
     }
 
     @Transactional
-    public void deleteUserByAdmin(Long userId) {
+    public void deleteUserByAdmin(Long userId, String token) {
+
         logger.warn("Admin deleting user with id={}", userId);
+
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> {
                     logger.error("User not found with id={}", userId);
                     return new IllegalArgumentException("User not found");
                 });
+
         userRepository.delete(user);
         logger.warn("Admin deleted user successfully with id={}", userId);
+
+        try {
+            webClient.method(HttpMethod.DELETE)          // <- IMPORTANT FIX
+                    .uri(walletProperties.getAdminUrl())
+                    .header("Authorization", "Bearer " + token)
+                    .bodyValue(Map.of("userId", userId))  // now valid
+                    .retrieve()
+                    .bodyToMono(Void.class)
+                    .block();
+
+            logger.info("Requested wallet-service to delete wallets for userId={}", userId);
+        }
+        catch (Exception ex) {
+            logger.error("Wallet cascade delete failed: {}", ex.getMessage());
+        }
     }
+
+
 }

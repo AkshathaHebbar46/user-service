@@ -80,7 +80,7 @@ public class AdminController {
             throw new UnauthorizedAccessException("You are not authorized");
         }
 
-        userService.deleteUserByAdmin(userId);
+        userService.deleteUserByAdmin(userId, token);
         logger.info("Admin deleted user with ID {}", userId);
         return ResponseEntity.noContent().build();
     }

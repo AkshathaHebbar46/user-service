@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 public class WalletServiceProperties {
 
     private String baseUrl;
+    private String adminUrl;
 
     public String getBaseUrl() {
         return baseUrl;
@@ -15,5 +16,13 @@ public class WalletServiceProperties {
 
     public void setBaseUrl(String baseUrl) {
         this.baseUrl = baseUrl;
+    }
+
+    public String getAdminUrl() {
+        return adminUrl;
+    }
+
+    public void setAdminUrl(String adminUrl) {
+        this.adminUrl = adminUrl;
     }
 }

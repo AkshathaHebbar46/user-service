@@ -8,13 +8,13 @@ import org.userservice.user_service.service.blacklist.BlacklistedUserService;
 
 @RestController
 @RequestMapping("/admin/users/blacklist")
-public class BlacklistedUserController {
+public class BlacklistedController {
 
-    private static final Logger logger = LoggerFactory.getLogger(BlacklistedUserController.class);
+    private static final Logger logger = LoggerFactory.getLogger(BlacklistedController.class);
 
     private final BlacklistedUserService blacklistedUserService;
 
-    public BlacklistedUserController(BlacklistedUserService blacklistedUserService) {
+    public BlacklistedController(BlacklistedUserService blacklistedUserService) {
         this.blacklistedUserService = blacklistedUserService;
     }
 

@@ -21,7 +21,14 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint {
                          HttpServletResponse response,
                          AuthenticationException authException) throws IOException {
 
-        logger.warn("Unauthorized access attempt to '{}': {}", request.getServletPath(), authException.getMessage());
+        String path = request.getServletPath();
+
+        // Skip Swagger and favicon requests
+        if (path.startsWith("/swagger-ui") || path.startsWith("/v3/api-docs") || path.equals("/favicon.ico")) {
+            return; // Let Spring Security handle access to these endpoints
+        }
+
+        logger.warn("Unauthorized access attempt to '{}': {}", path, authException.getMessage());
 
         response.setContentType("application/json");
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -30,7 +37,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint {
                 "{\"timestamp\":\"%s\",\"status\":401,\"error\":\"Unauthorized\",\"message\":\"%s\",\"path\":\"%s\"}",
                 LocalDateTime.now(),
                 authException.getMessage(),
-                request.getServletPath()
+                path
         );
 
         response.getWriter().write(json);

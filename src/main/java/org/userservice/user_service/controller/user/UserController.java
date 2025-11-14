@@ -26,14 +26,6 @@ public class UserController {
         this.authValidator = authValidator;
     }
 
-    @PostMapping
-    public ResponseEntity<UserResponseDTO> createUser(@Valid @RequestBody UserRequestDTO request) {
-        logger.info("Received request to create new user: {}", request.username());
-        UserResponseDTO response = userService.createUser(request);
-        logger.info("User created successfully: userId={}, email={}", response.id(), response.email());
-        return ResponseEntity.status(201).body(response);
-    }
-
     @GetMapping("/{userId}")
     public ResponseEntity<UserResponseDTO> getUser(@PathVariable Long userId, HttpServletRequest request) {
         if (!authValidator.isAuthorized(request, userId)) {
@@ -55,17 +47,5 @@ public class UserController {
         UserResponseDTO updatedUser = userService.patchUpdateUser(userId, patchRequest);
         logger.info("User updated successfully: userId={}", userId);
         return ResponseEntity.ok(updatedUser);
-    }
-
-    @DeleteMapping("/{userId}")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long userId, HttpServletRequest request) {
-        if (!authValidator.isAuthorized(request, userId)) {
-            logger.warn("Unauthorized access attempt to delete user: userId={}", userId);
-            return ResponseEntity.status(403).build();
-        }
-        logger.info("Deleting user with id={}", userId);
-        userService.deleteUser(userId);
-        logger.info("User deleted successfully: userId={}", userId);
-        return ResponseEntity.noContent().build();
     }
 }
