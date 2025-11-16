@@ -7,6 +7,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.userservice.user_service.entity.UserEntity;
+import org.userservice.user_service.properties.WalletServiceProperties;
 import org.userservice.user_service.repository.UserRepository;
 import reactor.core.publisher.Mono;
 
@@ -33,13 +34,15 @@ class BlacklistedUserServiceTest {
     @Mock
     private WebClient.RequestBodySpec bodySpec;
 
-    // IMPORTANT FIX: use raw type to avoid capture errors
-    @Mock
     @SuppressWarnings("rawtypes")
+    @Mock
     private WebClient.RequestHeadersSpec headersSpec;
 
     @Mock
     private WebClient.ResponseSpec responseSpec;
+
+    @Mock
+    private WalletServiceProperties walletServiceProperties;
 
     private BlacklistedUserService service;
 
@@ -50,11 +53,16 @@ class BlacklistedUserServiceTest {
     void setup() {
         MockitoAnnotations.openMocks(this);
 
+        // Mock WebClient builder
         when(webClientBuilder.baseUrl(anyString())).thenReturn(webClientBuilder);
         when(webClientBuilder.build()).thenReturn(webClient);
 
-        service = new BlacklistedUserService(userRepository, webClientBuilder);
+        // Mock WalletServiceProperties
+        when(walletServiceProperties.getAdminUrl()).thenReturn("http://localhost:8082/admin/wallets");
 
+        service = new BlacklistedUserService(userRepository, webClientBuilder, walletServiceProperties);
+
+        // Setup users
         activeUser = new UserEntity();
         activeUser.setId(1L);
         activeUser.setActive(true);
@@ -73,12 +81,8 @@ class BlacklistedUserServiceTest {
     private void mockWebClientPost(String expectedUri) {
         when(webClient.post()).thenReturn(uriSpec);
         when(uriSpec.uri(expectedUri)).thenReturn(bodySpec);
-
         when(bodySpec.header(eq("Authorization"), anyString())).thenReturn(bodySpec);
-
-        // FIX: bodyValue() returns RequestHeadersSpec<?> but mocks need raw type
         when(bodySpec.bodyValue(any())).thenReturn(headersSpec);
-
         when(headersSpec.retrieve()).thenReturn(responseSpec);
         when(responseSpec.bodyToMono(Void.class)).thenReturn(Mono.empty());
     }

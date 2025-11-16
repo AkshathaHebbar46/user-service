@@ -44,16 +44,6 @@ public class UserService {
         logger.info("UserService initialized");
     }
 
-    private UserEntity getCurrentAuthenticatedUser() {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        logger.debug("Fetching currently authenticated user by email={}", email);
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> {
-                    logger.error("Authenticated user not found with email={}", email);
-                    return new IllegalArgumentException("Authenticated user not found");
-                });
-    }
-
     @Transactional
     public UserResponseDTO createUser(UserRequestDTO request) {
         logger.info("Creating user with username={}", request.username());
@@ -154,7 +144,7 @@ public class UserService {
         logger.warn("Admin deleted user successfully with id={}", userId);
 
         try {
-            webClient.method(HttpMethod.DELETE)          // <- IMPORTANT FIX
+            webClient.method(HttpMethod.DELETE)
                     .uri(walletProperties.getAdminUrl())
                     .header("Authorization", "Bearer " + token)
                     .bodyValue(Map.of("userId", userId))  // now valid

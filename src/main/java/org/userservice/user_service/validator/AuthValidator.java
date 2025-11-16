@@ -19,10 +19,6 @@ public class AuthValidator {
         return "ADMIN".equals(jwtService.extractRole(token));
     }
 
-    public boolean isOwner(String token, Long userId) {
-        return jwtService.extractUserId(token).equals(userId);
-    }
-
     public String extractToken(HttpServletRequest request) {
         String header = request.getHeader("Authorization");
         if (header == null || !header.startsWith("Bearer ")) {

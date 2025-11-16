@@ -27,3 +27,6 @@ service:
     base-url: http://localhost:8082/wallets
     admin-url: http://localhost:8082/admin/wallets
 
+
+
+
