@@ -1,6 +1,11 @@
 package org.userservice.user_service.controller.admin;
 
 import jakarta.servlet.http.HttpServletRequest;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +33,14 @@ public class AdminController {
     }
 
     /** Get all users */
+    @Operation(summary = "Get all users", description = "Retrieve a list of all registered users (admin only).")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved list of users",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = UserResponseDTO.class))),
+            @ApiResponse(responseCode = "403", description = "Unauthorized access",
+                    content = @Content)
+    })
     @GetMapping
     public ResponseEntity<List<UserResponseDTO>> getAllUsers(HttpServletRequest request) {
         String token = authValidator.extractToken(request);
@@ -42,6 +55,16 @@ public class AdminController {
     }
 
     /** Get a single user by ID */
+    @Operation(summary = "Get user by ID", description = "Retrieve a single user's details by their ID (admin only).")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved user",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = UserResponseDTO.class))),
+            @ApiResponse(responseCode = "403", description = "Unauthorized access",
+                    content = @Content),
+            @ApiResponse(responseCode = "404", description = "User not found",
+                    content = @Content)
+    })
     @GetMapping("/{userId}")
     public ResponseEntity<UserResponseDTO> getUserById(@PathVariable Long userId,
                                                        HttpServletRequest request) {
@@ -57,6 +80,16 @@ public class AdminController {
     }
 
     /** Update user details */
+    @Operation(summary = "Update user", description = "Update user details by admin.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successfully updated user",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = UserResponseDTO.class))),
+            @ApiResponse(responseCode = "403", description = "Unauthorized access",
+                    content = @Content),
+            @ApiResponse(responseCode = "404", description = "User not found",
+                    content = @Content)
+    })
     @PatchMapping("/{userId}")
     public ResponseEntity<UserResponseDTO> updateUser(@PathVariable Long userId,
                                                       @RequestBody UserUpdateRequestDTO dto,
@@ -72,6 +105,15 @@ public class AdminController {
         return ResponseEntity.ok(updatedUser);
     }
 
+    @Operation(summary = "Delete user", description = "Delete a user by admin.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Successfully deleted user",
+                    content = @Content),
+            @ApiResponse(responseCode = "403", description = "Unauthorized access",
+                    content = @Content),
+            @ApiResponse(responseCode = "404", description = "User not found",
+                    content = @Content)
+    })
     @DeleteMapping("/{userId}")
     public ResponseEntity<Void> deleteUser(@PathVariable Long userId, HttpServletRequest request) {
         String token = authValidator.extractToken(request);

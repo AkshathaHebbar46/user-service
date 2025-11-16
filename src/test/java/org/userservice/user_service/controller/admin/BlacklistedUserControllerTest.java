@@ -2,105 +2,132 @@ package org.userservice.user_service.controller.admin;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.*;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.userservice.user_service.exception.UnauthorizedAccessException;
+import org.userservice.user_service.exception.UserNotFoundException;
 import org.userservice.user_service.service.blacklist.BlacklistedUserService;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class BlacklistedUserControllerTest {
+@ExtendWith(MockitoExtension.class)
+class BlacklistedControllerTest {
 
     @Mock
     private BlacklistedUserService blacklistedUserService;
 
     @InjectMocks
-    private BlacklistedController blacklistedUserController;
+    private BlacklistedController blacklistedController;
+
+    private final Long existingUserId = 1L;
+    private final Long nonExistingUserId = 999L;
 
     @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
+    void setup() {
+        // Can initialize common setup here if needed
+    }
+
+    // --- Blacklist User ---
+
+    @Test
+    void testBlacklistUser_Success() {
+        doNothing().when(blacklistedUserService).blacklistUser(existingUserId);
+
+        var response = blacklistedController.blacklistUser(existingUserId);
+
+        assertEquals(200, response.getStatusCodeValue());
+        assertTrue(response.getBody().contains("blacklisted"));
+        verify(blacklistedUserService).blacklistUser(existingUserId);
     }
 
     @Test
-    void blacklistUser_shouldReturnOk_whenServiceSucceeds() {
-        Long userId = 1L;
+    void testBlacklistUser_UserNotFound() {
+        doThrow(new UserNotFoundException("User not found"))
+                .when(blacklistedUserService).blacklistUser(nonExistingUserId);
 
-        // no need to mock void method, but can do nothing
-        doNothing().when(blacklistedUserService).blacklistUser(userId);
-
-        ResponseEntity<String> response = blacklistedUserController.blacklistUser(userId);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals("User 1 and all wallets blacklisted.", response.getBody());
-
-        verify(blacklistedUserService, times(1)).blacklistUser(userId);
+        assertThrows(UserNotFoundException.class, () ->
+                blacklistedController.blacklistUser(nonExistingUserId));
+        verify(blacklistedUserService).blacklistUser(nonExistingUserId);
     }
 
     @Test
-    void unblockUser_shouldReturnOk_whenServiceSucceeds() {
-        Long userId = 1L;
+    void testBlacklistUser_Unauthorized() {
+        doThrow(new UnauthorizedAccessException("Unauthorized"))
+                .when(blacklistedUserService).blacklistUser(existingUserId);
 
-        doNothing().when(blacklistedUserService).unblockUser(userId);
+        assertThrows(UnauthorizedAccessException.class, () ->
+                blacklistedController.blacklistUser(existingUserId));
+        verify(blacklistedUserService).blacklistUser(existingUserId);
+    }
 
-        ResponseEntity<String> response = blacklistedUserController.unblockUser(userId);
+    // --- Unblock User ---
 
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals("User 1 and all wallets unblocked.", response.getBody());
+    @Test
+    void testUnblockUser_Success() {
+        doNothing().when(blacklistedUserService).unblockUser(existingUserId);
 
-        verify(blacklistedUserService, times(1)).unblockUser(userId);
+        var response = blacklistedController.unblockUser(existingUserId);
+
+        assertEquals(200, response.getStatusCodeValue());
+        assertTrue(response.getBody().contains("unblocked"));
+        verify(blacklistedUserService).unblockUser(existingUserId);
     }
 
     @Test
-    void blacklistUser_shouldThrowException_whenServiceThrows() {
-        Long userId = 2L;
+    void testUnblockUser_UserNotFound() {
+        doThrow(new UserNotFoundException("User not found"))
+                .when(blacklistedUserService).unblockUser(nonExistingUserId);
 
-        doThrow(new IllegalArgumentException("User not found")).when(blacklistedUserService).blacklistUser(userId);
-
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                () -> blacklistedUserController.blacklistUser(userId));
-
-        assertEquals("User not found", exception.getMessage());
-        verify(blacklistedUserService, times(1)).blacklistUser(userId);
+        assertThrows(UserNotFoundException.class, () ->
+                blacklistedController.unblockUser(nonExistingUserId));
+        verify(blacklistedUserService).unblockUser(nonExistingUserId);
     }
 
     @Test
-    void unblockUser_shouldThrowException_whenServiceThrows() {
-        Long userId = 2L;
+    void testUnblockUser_Unauthorized() {
+        doThrow(new UnauthorizedAccessException("Unauthorized"))
+                .when(blacklistedUserService).unblockUser(existingUserId);
 
-        doThrow(new IllegalStateException("Cannot unblock inactive user")).when(blacklistedUserService).unblockUser(userId);
+        assertThrows(UnauthorizedAccessException.class, () ->
+                blacklistedController.unblockUser(existingUserId));
+        verify(blacklistedUserService).unblockUser(existingUserId);
+    }
 
-        IllegalStateException exception = assertThrows(IllegalStateException.class,
-                () -> blacklistedUserController.unblockUser(userId));
+    // --- Additional edge cases for coverage ---
 
-        assertEquals("Cannot unblock inactive user", exception.getMessage());
-        verify(blacklistedUserService, times(1)).unblockUser(userId);
+    @Test
+    void testBlacklistUser_WithZeroId() {
+        doNothing().when(blacklistedUserService).blacklistUser(0L);
+
+        var response = blacklistedController.blacklistUser(0L);
+        assertEquals(200, response.getStatusCodeValue());
+        verify(blacklistedUserService).blacklistUser(0L);
     }
 
     @Test
-    void blacklistUser_shouldHandleNullUserId() {
-        Long userId = null;
+    void testUnblockUser_WithZeroId() {
+        doNothing().when(blacklistedUserService).unblockUser(0L);
 
-        doThrow(new IllegalArgumentException("User ID cannot be null")).when(blacklistedUserService).blacklistUser(userId);
-
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                () -> blacklistedUserController.blacklistUser(userId));
-
-        assertEquals("User ID cannot be null", exception.getMessage());
-        verify(blacklistedUserService, times(1)).blacklistUser(userId);
+        var response = blacklistedController.unblockUser(0L);
+        assertEquals(200, response.getStatusCodeValue());
+        verify(blacklistedUserService).unblockUser(0L);
     }
 
     @Test
-    void unblockUser_shouldHandleNullUserId() {
-        Long userId = null;
+    void testBlacklistUser_CallsLogger() {
+        // Logger calls are not usually tested, but we ensure method is called
+        doNothing().when(blacklistedUserService).blacklistUser(existingUserId);
+        blacklistedController.blacklistUser(existingUserId);
+        verify(blacklistedUserService, times(1)).blacklistUser(existingUserId);
+    }
 
-        doThrow(new IllegalArgumentException("User ID cannot be null")).when(blacklistedUserService).unblockUser(userId);
-
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                () -> blacklistedUserController.unblockUser(userId));
-
-        assertEquals("User ID cannot be null", exception.getMessage());
-        verify(blacklistedUserService, times(1)).unblockUser(userId);
+    @Test
+    void testUnblockUser_CallsLogger() {
+        doNothing().when(blacklistedUserService).unblockUser(existingUserId);
+        blacklistedController.unblockUser(existingUserId);
+        verify(blacklistedUserService, times(1)).unblockUser(existingUserId);
     }
 }

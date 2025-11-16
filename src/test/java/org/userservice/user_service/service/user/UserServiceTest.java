@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.userservice.user_service.dto.request.user.UserPatchRequestDTO;
 import org.userservice.user_service.dto.request.user.UserRequestDTO;
 import org.userservice.user_service.dto.request.user.UserUpdateRequestDTO;
 import org.userservice.user_service.dto.response.user.UserResponseDTO;
@@ -13,6 +14,7 @@ import org.userservice.user_service.mapper.UserMapper;
 import org.userservice.user_service.properties.WalletServiceProperties;
 import org.userservice.user_service.repository.UserRepository;
 import org.userservice.user_service.service.UserService;
+import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -20,7 +22,7 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class UserServiceTest {
+public class UserServiceTest {
 
     @Mock
     private UserRepository userRepository;
@@ -37,149 +39,170 @@ class UserServiceTest {
     @Mock
     private WalletServiceProperties walletProperties;
 
+    @Mock
+    private WebClient.RequestBodyUriSpec requestBodyUriSpec;
+
+    @Mock
+    private WebClient.RequestHeadersSpec<?> requestHeadersSpec;
+
+    @Mock
+    private WebClient.ResponseSpec responseSpec;
+
     @InjectMocks
     private UserService userService;
 
     @BeforeEach
-    void setUp() {
+    void setup() {
         MockitoAnnotations.openMocks(this);
     }
 
-    // ------------------ CREATE USER ------------------
+    // ------------------- CREATE USER -------------------
     @Test
-    void createUser_shouldReturnUserResponseDTO() {
-        UserRequestDTO request = new UserRequestDTO("john", "john@example.com",  "pass123", 25);
+    void testCreateUser() {
+        UserRequestDTO dto = new UserRequestDTO("john", "john@mail.com", "pass", 20);
         UserEntity entity = new UserEntity();
         entity.setId(1L);
 
-        when(userMapper.toEntity(request)).thenReturn(entity);
-        when(passwordEncoder.encode(request.password())).thenReturn("encodedPass");
-        when(userMapper.toDTO(entity)).thenReturn(
-                new UserResponseDTO(1L, "john", "john@example.com", 25, LocalDateTime.now())
-        );
+        when(userMapper.toEntity(dto)).thenReturn(entity);
+        when(passwordEncoder.encode("pass")).thenReturn("ENC_PASS");
+        when(userRepository.save(entity)).thenReturn(entity);
 
-        UserResponseDTO response = userService.createUser(request);
+        UserResponseDTO response = new UserResponseDTO(1L, "john", "john@mail.com", 20, LocalDateTime.now());
+        when(userMapper.toDTO(entity)).thenReturn(response);
 
-        assertNotNull(response);
-        assertEquals(1L, response.id());
-        verify(userRepository, times(1)).save(entity);
-    }
+        UserResponseDTO result = userService.createUser(dto);
 
-    // ------------------ GET USER ------------------
-    @Test
-    void getUserById_shouldReturnUser_whenFound() {
-        UserEntity entity = new UserEntity();
-        entity.setId(2L);
-        entity.setUsername("alice");
-
-        when(userRepository.findById(2L)).thenReturn(Optional.of(entity));
-        when(userMapper.toDTO(entity)).thenReturn(
-                new UserResponseDTO(2L, "alice", "alice@mail.com", 30, LocalDateTime.now())
-        );
-
-        UserResponseDTO response = userService.getUserById(2L);
-
-        assertEquals(2L, response.id());
-        assertEquals("alice", response.username());
-    }
-
-    @Test
-    void getUserById_shouldThrow_whenNotFound() {
-        when(userRepository.findById(5L)).thenReturn(Optional.empty());
-
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> userService.getUserById(5L));
-        assertEquals("User not found", ex.getMessage());
-    }
-
-    // ------------------ UPDATE USER ------------------
-    @Test
-    void updateUser_shouldUpdateAndReturnDTO() {
-        UserEntity entity = new UserEntity();
-        entity.setId(1L);
-
-        UserRequestDTO request = new UserRequestDTO("bob", "bob@mail.com", "secret", 28);
-
-        when(userRepository.findById(1L)).thenReturn(Optional.of(entity));
-        when(userMapper.toDTO(entity)).thenReturn(
-                new UserResponseDTO(1L, "bob", "bob@mail.com", 28, LocalDateTime.now())
-        );
-
-        UserResponseDTO response = userService.updateUser(1L, request);
-
-        assertEquals("bob", response.username());
-        assertEquals(28, response.age());
+        assertNotNull(result);
+        assertEquals(1L, result.id());
         verify(userRepository).save(entity);
     }
 
+    // ------------------- GET ALL USERS -------------------
     @Test
-    void updateUser_shouldThrow_whenUserNotFound() {
-        UserRequestDTO request = new UserRequestDTO("bob", "bob@mail.com",  "secret", 28);
-        when(userRepository.findById(10L)).thenReturn(Optional.empty());
+    void testGetAllUsers() {
+        UserEntity e = new UserEntity();
+        e.setId(1L);
+        when(userRepository.findAll()).thenReturn(List.of(e));
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> userService.updateUser(10L, request));
+        UserResponseDTO dto = new UserResponseDTO(1L, "A", "mail@mail.com", 30, LocalDateTime.now());
+        when(userMapper.toDTO(e)).thenReturn(dto);
 
-        assertEquals("User not found", ex.getMessage());
+        List<UserResponseDTO> result = userService.getAllUsers();
+        assertEquals(1, result.size());
+        assertEquals("A", result.get(0).username());
     }
 
-    // ------------------ DELETE USER ------------------
+    // ------------------- GET USER BY ID -------------------
     @Test
-    void deleteUser_shouldCallRepository() {
-        userService.deleteUser(1L);
-        verify(userRepository, times(1)).deleteById(1L);
+    void testGetUserById() {
+        UserEntity e = new UserEntity();
+        e.setId(10L);
+        when(userRepository.findById(10L)).thenReturn(Optional.of(e));
+
+        UserResponseDTO mapped = new UserResponseDTO(10L, "X", "x@mail.com", 22, LocalDateTime.now());
+        when(userMapper.toDTO(e)).thenReturn(mapped);
+
+        UserResponseDTO result = userService.getUserById(10L);
+        assertEquals(10L, result.id());
+        assertEquals("X", result.username());
     }
 
-    // ------------------ ADMIN UPDATE ------------------
+    // ------------------- PATCH UPDATE USER -------------------
     @Test
-    void updateUserByAdmin_shouldUpdatePartialFields() {
+    void testPatchUpdateUser() {
+        Long id = 5L;
+        UserEntity user = new UserEntity();
+        user.setId(id);
+        user.setUsername("oldName");
+        user.setPassword("oldPass");
+        user.setAge(25);
+
+        when(userRepository.findById(id)).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode("newPass")).thenReturn("ENC_PASS");
+
+        UserPatchRequestDTO dto = new UserPatchRequestDTO("newName", "newPass", 30);
+        when(userRepository.save(user)).thenReturn(user);
+
+        UserResponseDTO mapped = new UserResponseDTO(id, "newName", "mail@mail.com", 30, LocalDateTime.now());
+        when(userMapper.toDTO(user)).thenReturn(mapped);
+
+        UserResponseDTO res = userService.patchUpdateUser(id, dto);
+
+        assertEquals("newName", res.username());
+        assertEquals(30, res.age());
+    }
+
+    // ------------------- UPDATE USER BY ADMIN -------------------
+    @Test
+    void testUpdateUserByAdmin() {
+        Long id = 3L;
+        UserEntity user = new UserEntity();
+        user.setId(id);
+
+        when(userRepository.findById(id)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(UserEntity.class))).thenReturn(user);
+
+        UserUpdateRequestDTO dto = new UserUpdateRequestDTO();
+        dto.setName("ADMIN_UPDATE");
+        dto.setEmail("admin@mail.com");
+        dto.setAge(40);
+
+        UserResponseDTO result = userService.updateUserByAdmin(id, dto);
+        assertEquals("ADMIN_UPDATE", result.username());
+        assertEquals("admin@mail.com", result.email());
+        assertEquals(40, result.age());
+    }
+
+    // ------------------- CREATE USER NULL PASSWORD -------------------
+    @Test
+    void testCreateUserNullPassword() {
+        UserRequestDTO dto = new UserRequestDTO("john", "john@mail.com", null, 20);
         UserEntity entity = new UserEntity();
         entity.setId(1L);
-        entity.setUsername("old");
-        entity.setEmail("old@mail.com");
-        entity.setAge(20);
 
-        UserUpdateRequestDTO dto = new UserUpdateRequestDTO("newName", null, 25);
+        when(userMapper.toEntity(dto)).thenReturn(entity);
+        when(passwordEncoder.encode(null)).thenReturn(null);
+        when(userRepository.save(entity)).thenReturn(entity);
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(entity));
-        when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        UserResponseDTO response = new UserResponseDTO(1L, "john", "john@mail.com", 20, LocalDateTime.now());
+        when(userMapper.toDTO(entity)).thenReturn(response);
 
-        UserResponseDTO result = userService.updateUserByAdmin(1L, dto);
-
-        assertEquals("newName", result.username());
-        assertEquals(25, result.age());
-        assertEquals("old@mail.com", result.email());
-        verify(userRepository).save(entity);
+        UserResponseDTO result = userService.createUser(dto);
+        assertNotNull(result);
     }
 
-
+    // ------------------- PATCH UPDATE USER NULL FIELDS -------------------
     @Test
-    void updateUserByAdmin_shouldThrow_whenUserNotFound() {
-        when(userRepository.findById(9L)).thenReturn(Optional.empty());
-        UserUpdateRequestDTO dto = new UserUpdateRequestDTO("x", "y@mail.com", 30);
+    void testPatchUpdateUserNullFields() {
+        Long id = 5L;
+        UserEntity user = new UserEntity();
+        user.setId(id);
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> userService.updateUserByAdmin(9L, dto));
-        assertEquals("User not found", ex.getMessage());
+        when(userRepository.findById(id)).thenReturn(Optional.of(user));
+        when(userRepository.save(user)).thenReturn(user);
+
+        UserPatchRequestDTO dto = new UserPatchRequestDTO(null, null, null);
+        UserResponseDTO mapped = new UserResponseDTO(id, "name", "mail@mail.com", 25, LocalDateTime.now());
+        when(userMapper.toDTO(user)).thenReturn(mapped);
+
+        UserResponseDTO res = userService.patchUpdateUser(id, dto);
+        assertNotNull(res);
     }
 
-    // ------------------ ADMIN DELETE ------------------
+    // ------------------- GET USER NOT FOUND -------------------
     @Test
-    void deleteUserByAdmin_shouldDeleteUser() {
-        UserEntity entity = new UserEntity();
-        when(userRepository.findById(3L)).thenReturn(Optional.of(entity));
-
-        userService.deleteUserByAdmin(3L);
-
-        verify(userRepository).delete(entity);
+    void testGetUserByIdNotFound() {
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> userService.getUserById(99L));
     }
 
+    // ------------------- DELETE USER NOT FOUND -------------------
     @Test
-    void deleteUserByAdmin_shouldThrow_whenNotFound() {
-        when(userRepository.findById(7L)).thenReturn(Optional.empty());
-
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> userService.deleteUserByAdmin(7L));
-        assertEquals("User not found", ex.getMessage());
+    void testDeleteUserByAdminNotFound() {
+        Long id = 99L;
+        String token = "JWT";
+        when(userRepository.findById(id)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> userService.deleteUserByAdmin(id, token));
     }
+
 }

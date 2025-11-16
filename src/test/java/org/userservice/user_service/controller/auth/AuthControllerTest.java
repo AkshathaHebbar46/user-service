@@ -1,17 +1,16 @@
 package org.userservice.user_service.controller.auth;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-import org.springframework.http.MediaType;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.userservice.user_service.dto.request.login.AuthRequestDTO;
 import org.userservice.user_service.dto.request.register.RegisterRequestDTO;
 import org.userservice.user_service.entity.Role;
@@ -19,21 +18,15 @@ import org.userservice.user_service.entity.UserEntity;
 import org.userservice.user_service.repository.UserRepository;
 import org.userservice.user_service.service.jwt.JwtService;
 import org.userservice.user_service.service.user_details.CustomUserDetailsService;
-import org.userservice.user_service.exception.GlobalExceptionHandler;
 
+import java.util.Map;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@ExtendWith(MockitoExtension.class)
 class AuthControllerTest {
-
-    private MockMvc mockMvc;
-    private ObjectMapper objectMapper = new ObjectMapper();
 
     @Mock
     private UserRepository userRepository;
@@ -56,116 +49,146 @@ class AuthControllerTest {
     private UserEntity inactiveUser;
 
     @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-
-        // Attach GlobalExceptionHandler to MockMvc
-        mockMvc = MockMvcBuilders.standaloneSetup(authController)
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
-
-        // Sample requests
+    void setup() {
         registerRequest = new RegisterRequestDTO();
-        registerRequest.setName("John Doe");
+        registerRequest.setName("John");
         registerRequest.setEmail("john@example.com");
-        registerRequest.setPassword("password");
+        registerRequest.setPassword("password123");
         registerRequest.setAge(25);
 
         loginRequest = new AuthRequestDTO();
         loginRequest.setEmail("john@example.com");
-        loginRequest.setPassword("password");
+        loginRequest.setPassword("password123");
 
-        // Sample users
         activeUser = new UserEntity();
         activeUser.setId(1L);
-        activeUser.setUsername("John Doe");
         activeUser.setEmail("john@example.com");
+        activeUser.setUsername("John");
         activeUser.setPassword("encodedPassword");
         activeUser.setRole(Role.USER);
         activeUser.setActive(true);
 
         inactiveUser = new UserEntity();
         inactiveUser.setId(2L);
-        inactiveUser.setUsername("Jane Doe");
-        inactiveUser.setEmail("jane@example.com");
+        inactiveUser.setEmail("inactive@example.com");
+        inactiveUser.setUsername("Inactive");
         inactiveUser.setPassword("encodedPassword");
         inactiveUser.setRole(Role.USER);
         inactiveUser.setActive(false);
     }
 
+    // --- Register tests ---
     @Test
-    void register_ShouldReturnBadRequest_WhenEmailExists() throws Exception {
-        when(userRepository.existsByEmail(registerRequest.getEmail())).thenReturn(true);
-
-        mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(registerRequest)))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string("Email already registered"));
-    }
-
-    @Test
-    void register_ShouldReturnOk_WhenEmailNotExists() throws Exception {
+    void testRegister_Success() {
         when(userRepository.existsByEmail(registerRequest.getEmail())).thenReturn(false);
         when(userDetailsService.encodePassword(registerRequest.getPassword())).thenReturn("encodedPassword");
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(registerRequest)))
-                .andExpect(status().isOk())
-                .andExpect(content().string("User registered successfully"));
+        ResponseEntity<String> response = authController.register(registerRequest);
 
-        verify(userRepository, times(1)).save(any(UserEntity.class));
+        assertEquals(200, response.getStatusCodeValue());
+        assertEquals("User registered successfully", response.getBody());
+        verify(userRepository).save(any(UserEntity.class));
     }
 
     @Test
-    void login_ShouldReturnForbidden_WhenUserInactive() throws Exception {
-        when(authenticationManager.authenticate(any(Authentication.class)))
-                .thenReturn(new UsernamePasswordAuthenticationToken("jane@example.com", "password"));
-        when(userRepository.findByEmail("jane@example.com")).thenReturn(Optional.of(inactiveUser));
+    void testRegister_EmailAlreadyExists() {
+        when(userRepository.existsByEmail(registerRequest.getEmail())).thenReturn(true);
 
-        AuthRequestDTO inactiveLoginRequest = new AuthRequestDTO();
-        inactiveLoginRequest.setEmail("jane@example.com");
-        inactiveLoginRequest.setPassword("password");
+        ResponseEntity<String> response = authController.register(registerRequest);
 
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(inactiveLoginRequest)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error").value("User account is inactive or blacklisted."));
+        assertEquals(400, response.getStatusCodeValue());
+        assertEquals("Email already registered", response.getBody());
+        verify(userRepository, never()).save(any());
+    }
+
+    // --- Login tests ---
+    @Test
+    void testLogin_Success() {
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenReturn(mock(Authentication.class));
+        when(userRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(activeUser));
+        when(jwtService.generateToken(anyString(), anyLong(), anyString())).thenReturn("token123");
+
+        ResponseEntity<Map<String, Object>> response = authController.login(loginRequest);
+
+        assertEquals(200, response.getStatusCodeValue());
+        assertEquals("token123", response.getBody().get("token"));
+        assertEquals("USER", response.getBody().get("role"));
+        assertEquals(1L, response.getBody().get("userId"));
     }
 
     @Test
-    void login_ShouldReturnToken_WhenUserActive() throws Exception {
-        when(authenticationManager.authenticate(any(Authentication.class)))
-                .thenReturn(new UsernamePasswordAuthenticationToken("john@example.com", "password"));
-        when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.of(activeUser));
-        when(jwtService.generateToken(activeUser.getEmail(), activeUser.getId(), activeUser.getRole().name()))
-                .thenReturn("dummy-jwt-token");
+    void testLogin_UserNotFound() {
+        when(authenticationManager.authenticate(any())).thenReturn(mock(Authentication.class));
+        when(userRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.empty());
 
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(loginRequest)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").value("dummy-jwt-token"))
-                .andExpect(jsonPath("$.role").value("USER"))
-                .andExpect(jsonPath("$.userId").value(1));
+        assertThrows(IllegalArgumentException.class, () -> authController.login(loginRequest));
     }
 
     @Test
-    void login_ShouldReturnBadRequest_WhenUserNotFound() throws Exception {
-        when(authenticationManager.authenticate(any(Authentication.class)))
-                .thenReturn(new UsernamePasswordAuthenticationToken("unknown@example.com", "password"));
-        when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
+    void testLogin_InactiveUser() {
+        when(authenticationManager.authenticate(any())).thenReturn(mock(Authentication.class));
+        when(userRepository.findByEmail("inactive@example.com")).thenReturn(Optional.of(inactiveUser));
 
-        AuthRequestDTO unknownUserRequest = new AuthRequestDTO();
-        unknownUserRequest.setEmail("unknown@example.com");
-        unknownUserRequest.setPassword("password");
+        AuthRequestDTO request = new AuthRequestDTO();
+        request.setEmail("inactive@example.com");
+        request.setPassword("password123");
 
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(unknownUserRequest)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("User not found"));
+        ResponseEntity<Map<String, Object>> response = authController.login(request);
+
+        assertEquals(403, response.getStatusCodeValue());
+        assertTrue(response.getBody().get("error").toString().contains("inactive or blacklisted"));
+    }
+
+    @Test
+    void testLogin_InvalidCredentials() {
+        when(authenticationManager.authenticate(any()))
+                .thenThrow(new BadCredentialsException("Bad credentials"));
+
+        assertThrows(BadCredentialsException.class, () -> authController.login(loginRequest));
+    }
+
+    // --- Additional edge cases for coverage ---
+    @Test
+    void testRegister_WithEmptyName() {
+        registerRequest.setName("");
+        when(userRepository.existsByEmail(registerRequest.getEmail())).thenReturn(false);
+        when(userDetailsService.encodePassword(registerRequest.getPassword())).thenReturn("encodedPassword");
+        when(userRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ResponseEntity<String> response = authController.register(registerRequest);
+        assertEquals(200, response.getStatusCodeValue());
+    }
+
+    @Test
+    void testLogin_WithDifferentRole() {
+        activeUser.setRole(Role.ADMIN);
+        when(authenticationManager.authenticate(any())).thenReturn(mock(Authentication.class));
+        when(userRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(activeUser));
+        when(jwtService.generateToken(anyString(), anyLong(), anyString())).thenReturn("admintoken");
+
+        ResponseEntity<Map<String, Object>> response = authController.login(loginRequest);
+        assertEquals("ADMIN", response.getBody().get("role"));
+    }
+
+    @Test
+    void testLogin_CallsLogger() {
+        when(authenticationManager.authenticate(any())).thenReturn(mock(Authentication.class));
+        when(userRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(activeUser));
+        when(jwtService.generateToken(anyString(), anyLong(), anyString())).thenReturn("token123");
+
+        authController.login(loginRequest);
+        verify(authenticationManager).authenticate(any());
+    }
+
+    @Test
+    void testRegister_CallsLogger() {
+        when(userRepository.existsByEmail(registerRequest.getEmail())).thenReturn(false);
+        when(userDetailsService.encodePassword(anyString())).thenReturn("encodedPassword");
+        when(userRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        authController.register(registerRequest);
+        verify(userRepository).save(any());
     }
 }

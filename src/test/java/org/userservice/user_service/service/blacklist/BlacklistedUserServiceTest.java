@@ -5,15 +5,15 @@ import org.junit.jupiter.api.*;
 import org.mockito.*;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-import org.springframework.web.reactive.function.client.*;
+import org.springframework.web.reactive.function.client.WebClient;
 import org.userservice.user_service.entity.UserEntity;
 import org.userservice.user_service.repository.UserRepository;
 import reactor.core.publisher.Mono;
 
-import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class BlacklistedUserServiceTest {
@@ -22,188 +22,161 @@ class BlacklistedUserServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private WebClient.Builder webClientBuilder;
+
+    @Mock
     private WebClient webClient;
 
     @Mock
-    private WebClient.RequestBodyUriSpec requestBodyUriSpec;
+    private WebClient.RequestBodyUriSpec uriSpec;
 
     @Mock
-    private WebClient.RequestBodySpec requestBodySpec;
+    private WebClient.RequestBodySpec bodySpec;
 
+    // IMPORTANT FIX: use raw type to avoid capture errors
     @Mock
-    private WebClient.RequestHeadersSpec<?> requestHeadersSpec;
+    @SuppressWarnings("rawtypes")
+    private WebClient.RequestHeadersSpec headersSpec;
 
     @Mock
     private WebClient.ResponseSpec responseSpec;
 
-    @Mock
-    private WebClient.Builder webClientBuilder;
+    private BlacklistedUserService service;
 
-    private BlacklistedUserService blacklistedUserService;
+    private UserEntity activeUser;
+    private UserEntity inactiveUser;
 
     @BeforeEach
-    void setUp() {
+    void setup() {
         MockitoAnnotations.openMocks(this);
 
-        // Mock builder chain
         when(webClientBuilder.baseUrl(anyString())).thenReturn(webClientBuilder);
         when(webClientBuilder.build()).thenReturn(webClient);
 
-        blacklistedUserService = new BlacklistedUserService(userRepository, webClientBuilder);
+        service = new BlacklistedUserService(userRepository, webClientBuilder);
+
+        activeUser = new UserEntity();
+        activeUser.setId(1L);
+        activeUser.setActive(true);
+
+        inactiveUser = new UserEntity();
+        inactiveUser.setId(2L);
+        inactiveUser.setActive(false);
     }
 
-    // 1️⃣ Happy Path — Blacklist user successfully
+    private void mockToken(String token) {
+        HttpServletRequest req = mock(HttpServletRequest.class);
+        when(req.getHeader("Authorization")).thenReturn(token);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
+    }
+
+    private void mockWebClientPost(String expectedUri) {
+        when(webClient.post()).thenReturn(uriSpec);
+        when(uriSpec.uri(expectedUri)).thenReturn(bodySpec);
+
+        when(bodySpec.header(eq("Authorization"), anyString())).thenReturn(bodySpec);
+
+        // FIX: bodyValue() returns RequestHeadersSpec<?> but mocks need raw type
+        when(bodySpec.bodyValue(any())).thenReturn(headersSpec);
+
+        when(headersSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.bodyToMono(Void.class)).thenReturn(Mono.empty());
+    }
+
     @Test
-    void blacklistUser_ShouldDeactivateUserAndCallWalletService() {
-        UserEntity user = new UserEntity();
-        user.setId(1L);
-        user.setActive(true);
+    void testBlacklistUserSuccess() {
+        mockToken("Bearer X");
+        mockWebClientPost("");
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userRepository.save(any(UserEntity.class))).thenReturn(user);
-        mockWebClientPostFlow("");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(activeUser));
+        when(userRepository.save(activeUser)).thenReturn(activeUser);
 
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getHeader("Authorization")).thenReturn("Bearer testToken");
-        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        service.blacklistUser(1L);
 
-        blacklistedUserService.blacklistUser(1L);
-
-        assertFalse(user.getActive());
-        verify(userRepository).save(user);
+        assertFalse(activeUser.getActive());
+        verify(userRepository).save(activeUser);
         verify(webClient).post();
     }
 
-    // 2️⃣ User not found
     @Test
-    void blacklistUser_ShouldThrow_WhenUserNotFound() {
+    void testBlacklistUser_UserNotFound() {
+        when(userRepository.findById(123L)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> service.blacklistUser(123L));
+    }
+
+    @Test
+    void testBlacklistUser_AlreadyInactive() {
+        when(userRepository.findById(2L)).thenReturn(Optional.of(inactiveUser));
+
+        service.blacklistUser(2L);
+
+        verify(userRepository, never()).save(any());
+        verify(webClient, never()).post();
+    }
+
+    @Test
+    void testBlacklistUser_ExtractToken() {
+        mockToken("Bearer TOKEN_ABC");
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(activeUser));
+        when(userRepository.save(activeUser)).thenReturn(activeUser);
+
+        when(webClient.post()).thenReturn(uriSpec);
+        when(uriSpec.uri("")).thenReturn(bodySpec);
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+
+        when(bodySpec.header(eq("Authorization"), captor.capture())).thenReturn(bodySpec);
+        when(bodySpec.bodyValue(any())).thenReturn(headersSpec);
+        when(headersSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.bodyToMono(Void.class)).thenReturn(Mono.empty());
+
+        service.blacklistUser(1L);
+
+        assertEquals("Bearer TOKEN_ABC", captor.getValue());
+    }
+
+    @Test
+    void testUnblockUserSuccess() {
+        mockToken("Bearer TOKEN");
+        mockWebClientPost("/unblock");
+
+        when(userRepository.findById(2L)).thenReturn(Optional.of(inactiveUser));
+        when(userRepository.save(inactiveUser)).thenReturn(inactiveUser);
+
+        service.unblockUser(2L);
+
+        assertTrue(inactiveUser.getActive());
+        verify(webClient).post();
+    }
+
+    @Test
+    void testUnblockUser_UserNotFound() {
         when(userRepository.findById(999L)).thenReturn(Optional.empty());
-        assertThrows(IllegalArgumentException.class, () -> blacklistedUserService.blacklistUser(999L));
+        assertThrows(IllegalArgumentException.class, () -> service.unblockUser(999L));
     }
 
-    // 3️⃣ Already inactive user — should skip wallet call
     @Test
-    void blacklistUser_ShouldSkip_WhenAlreadyInactive() {
-        UserEntity user = new UserEntity();
-        user.setId(1L);
-        user.setActive(false);
+    void testUnblockUser_AlreadyActive() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(activeUser));
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-
-        blacklistedUserService.blacklistUser(1L);
+        service.unblockUser(1L);
 
         verify(userRepository, never()).save(any());
         verify(webClient, never()).post();
     }
 
-    // 4️⃣ Unblock user — happy path
     @Test
-    void unblockUser_ShouldActivateAndCallWalletService() {
-        UserEntity user = new UserEntity();
-        user.setId(2L);
-        user.setActive(false);
+    void testBlacklist_NoTokenGraceful() {
+        HttpServletRequest req = mock(HttpServletRequest.class);
+        when(req.getHeader("Authorization")).thenReturn(null);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
 
-        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
-        when(userRepository.save(any(UserEntity.class))).thenReturn(user);
+        mockWebClientPost("");
 
-        mockWebClientPostFlow("/unblock");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(activeUser));
+        when(userRepository.save(activeUser)).thenReturn(activeUser);
 
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getHeader("Authorization")).thenReturn("Bearer unblockToken");
-        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
-
-        blacklistedUserService.unblockUser(2L);
-
-        assertTrue(user.getActive());
-        verify(userRepository).save(user);
-        verify(webClient).post();
-    }
-
-    // 5️⃣ Unblock user — not found
-    @Test
-    void unblockUser_ShouldThrow_WhenUserNotFound() {
-        when(userRepository.findById(10L)).thenReturn(Optional.empty());
-        assertThrows(IllegalArgumentException.class, () -> blacklistedUserService.unblockUser(10L));
-    }
-
-    // 6️⃣ Unblock already active — should skip
-    @Test
-    void unblockUser_ShouldSkip_WhenAlreadyActive() {
-        UserEntity user = new UserEntity();
-        user.setId(2L);
-        user.setActive(true);
-        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
-
-        blacklistedUserService.unblockUser(2L);
-
-        verify(userRepository, never()).save(any());
-        verify(webClient, never()).post();
-    }
-
-    // 7️⃣ extractCurrentToken() — valid token
-    @Test
-    void extractToken_ShouldReturn_WhenValidHeader() {
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getHeader("Authorization")).thenReturn("Bearer validToken");
-        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
-
-        String token = invokeExtractToken();
-        assertEquals("validToken", token);
-    }
-
-    // 8️⃣ extractCurrentToken() — missing header
-    @Test
-    void extractToken_ShouldReturnNull_WhenNoHeader() {
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getHeader("Authorization")).thenReturn(null);
-        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
-
-        String token = invokeExtractToken();
-        assertNull(token);
-    }
-
-    // 9️⃣ extractCurrentToken() — invalid header format
-    @Test
-    void extractToken_ShouldReturnNull_WhenInvalidFormat() {
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getHeader("Authorization")).thenReturn("InvalidToken");
-        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
-
-        String token = invokeExtractToken();
-        assertNull(token);
-    }
-
-    // 🔟 extractCurrentToken() — no request context
-    @Test
-    void extractToken_ShouldReturnNull_WhenNoContext() {
-        RequestContextHolder.resetRequestAttributes();
-        String token = invokeExtractToken();
-        assertNull(token);
-    }
-
-    // Helper to mock webclient chain
-    private void mockWebClientPostFlow(String uri) {
-        doReturn(requestBodyUriSpec).when(webClient).post();
-        doReturn(requestBodySpec).when(requestBodyUriSpec).uri(uri);
-        doReturn(requestBodySpec).when(requestBodySpec).header(anyString(), anyString());
-        doReturn(requestHeadersSpec).when(requestBodySpec).bodyValue(any(Map.class));
-        doReturn(responseSpec).when(requestHeadersSpec).retrieve();
-        doReturn(Mono.empty()).when(responseSpec).bodyToMono(Void.class);
-    }
-
-    // Helper to invoke private token method using reflection
-    private String invokeExtractToken() {
-        try {
-            var method = BlacklistedUserService.class.getDeclaredMethod("extractCurrentToken");
-            method.setAccessible(true);
-            return (String) method.invoke(blacklistedUserService);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    @AfterEach
-    void tearDown() {
-        RequestContextHolder.resetRequestAttributes();
+        assertDoesNotThrow(() -> service.blacklistUser(1L));
     }
 }

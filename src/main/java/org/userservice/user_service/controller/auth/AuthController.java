@@ -1,5 +1,11 @@
 package org.userservice.user_service.controller.auth;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +46,12 @@ public class AuthController {
         this.authenticationManager = authenticationManager;
     }
 
+    @Operation(summary = "Register a new user", description = "Registers a new user with name, email, password, and age. Returns success message.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "User registered successfully"),
+            @ApiResponse(responseCode = "400", description = "Email already registered", content = @Content),
+            @ApiResponse(responseCode = "422", description = "Validation failed", content = @Content)
+    })
     @PostMapping("/register")
     public ResponseEntity<String> register(@Valid @RequestBody RegisterRequestDTO request) {
         if (userRepository.existsByEmail(request.getEmail())) {
@@ -60,6 +72,13 @@ public class AuthController {
         return ResponseEntity.ok("User registered successfully");
     }
 
+    @Operation(summary = "User login", description = "Authenticates a user and returns a JWT token, role, and userId.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Login successful",
+                    content = @Content(schema = @Schema(implementation = Map.class))),
+            @ApiResponse(responseCode = "403", description = "User account is inactive or blacklisted", content = @Content),
+            @ApiResponse(responseCode = "401", description = "Invalid credentials", content = @Content)
+    })
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody AuthRequestDTO request) {
         Authentication authentication = authenticationManager.authenticate(
@@ -92,5 +111,4 @@ public class AuthController {
 
         return ResponseEntity.ok(response);
     }
-
 }

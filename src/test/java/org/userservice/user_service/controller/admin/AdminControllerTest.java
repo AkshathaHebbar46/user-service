@@ -1,31 +1,27 @@
 package org.userservice.user_service.controller.admin;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.userservice.user_service.dto.request.user.UserUpdateRequestDTO;
 import org.userservice.user_service.dto.response.user.UserResponseDTO;
-import org.userservice.user_service.exception.GlobalExceptionHandler;
+import org.userservice.user_service.exception.UnauthorizedAccessException;
+import org.userservice.user_service.exception.UserNotFoundException;
 import org.userservice.user_service.service.UserService;
 import org.userservice.user_service.validator.AuthValidator;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@ExtendWith(MockitoExtension.class)
 class AdminControllerTest {
-
-    private MockMvc mockMvc;
-    private ObjectMapper objectMapper;
 
     @Mock
     private UserService userService;
@@ -33,139 +29,118 @@ class AdminControllerTest {
     @Mock
     private AuthValidator authValidator;
 
+    @Mock
+    private HttpServletRequest request;
+
     @InjectMocks
     private AdminController adminController;
 
-    private UserResponseDTO sampleUser;
+    private UserResponseDTO user;
 
     @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-        objectMapper = new ObjectMapper();
-        mockMvc = MockMvcBuilders.standaloneSetup(adminController)
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
-
-        sampleUser = new UserResponseDTO(
-                1L,
-                "John Doe",
-                "john@example.com",
-                25,
-                LocalDateTime.now()
-        );
+    void setup() {
+        user = new UserResponseDTO(1L, "john", "john@example.com", 25, LocalDateTime.now());
     }
 
-    // ================= GET ALL USERS =================
     @Test
-    void getAllUsers_ShouldReturnUsers_WhenAdmin() throws Exception {
-        when(authValidator.extractToken(any())).thenReturn("token");
+    void testGetAllUsers_Admin() {
+        when(authValidator.extractToken(request)).thenReturn("token");
         when(authValidator.isAdmin("token")).thenReturn(true);
-        when(userService.getAllUsers()).thenReturn(List.of(sampleUser));
+        when(userService.getAllUsers()).thenReturn(List.of(user));
 
-        mockMvc.perform(get("/admin/users"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(1))
-                .andExpect(jsonPath("$[0].username").value("John Doe"));
+        var response = adminController.getAllUsers(request);
 
-        verify(userService, times(1)).getAllUsers();
+        assertEquals(1, response.getBody().size());
+        verify(userService).getAllUsers();
     }
 
     @Test
-    void getAllUsers_ShouldReturnForbidden_WhenNotAdmin() throws Exception {
-        when(authValidator.extractToken(any())).thenReturn("token");
+    void testGetAllUsers_NotAdmin() {
+        when(authValidator.extractToken(request)).thenReturn("token");
         when(authValidator.isAdmin("token")).thenReturn(false);
 
-        mockMvc.perform(get("/admin/users"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.message").value("You are not authorized to access this resource"));
-
+        assertThrows(UnauthorizedAccessException.class, () -> adminController.getAllUsers(request));
         verify(userService, never()).getAllUsers();
     }
 
-    // ================= GET USER BY ID =================
     @Test
-    void getUserById_ShouldReturnUser_WhenAdmin() throws Exception {
-        when(authValidator.extractToken(any())).thenReturn("token");
+    void testGetUserById_Admin() {
+        when(authValidator.extractToken(request)).thenReturn("token");
         when(authValidator.isAdmin("token")).thenReturn(true);
-        when(userService.getUserById(1L)).thenReturn(sampleUser);
+        when(userService.getUserById(1L)).thenReturn(user);
 
-        mockMvc.perform(get("/admin/users/1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.username").value("John Doe"));
+        var response = adminController.getUserById(1L, request);
+
+        assertEquals(user, response.getBody());
+        verify(userService).getUserById(1L);
     }
 
     @Test
-    void getUserById_ShouldReturnForbidden_WhenNotAdmin() throws Exception {
-        when(authValidator.extractToken(any())).thenReturn("token");
+    void testGetUserById_NotAdmin() {
+        when(authValidator.extractToken(request)).thenReturn("token");
         when(authValidator.isAdmin("token")).thenReturn(false);
 
-        mockMvc.perform(get("/admin/users/1"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.message").value("You are not authorized to access this resource"));
+        assertThrows(UnauthorizedAccessException.class, () -> adminController.getUserById(1L, request));
     }
 
-    // ================= UPDATE USER =================
     @Test
-    void updateUser_ShouldReturnUpdatedUser_WhenAdmin() throws Exception {
-        UserUpdateRequestDTO updateDto = new UserUpdateRequestDTO();
-        updateDto.setName("Jane Doe");
-
-        UserResponseDTO updatedUser = new UserResponseDTO(
-                1L,
-                "Jane Doe",
-                "john@example.com",
-                25,
-                LocalDateTime.now()
-        );
-
-        when(authValidator.extractToken(any())).thenReturn("token");
+    void testUpdateUser_Admin() {
+        UserUpdateRequestDTO dto = new UserUpdateRequestDTO();
+        when(authValidator.extractToken(request)).thenReturn("token");
         when(authValidator.isAdmin("token")).thenReturn(true);
-        when(userService.updateUserByAdmin(eq(1L), any(UserUpdateRequestDTO.class))).thenReturn(updatedUser);
+        when(userService.updateUserByAdmin(1L, dto)).thenReturn(user);
 
-        mockMvc.perform(patch("/admin/users/1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(updateDto)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.username").value("Jane Doe"));
+        var response = adminController.updateUser(1L, dto, request);
+
+        assertEquals(user, response.getBody());
+        verify(userService).updateUserByAdmin(1L, dto);
     }
 
     @Test
-    void updateUser_ShouldReturnForbidden_WhenNotAdmin() throws Exception {
-        UserUpdateRequestDTO updateDto = new UserUpdateRequestDTO();
-        updateDto.setName("Jane Doe");
-
-        when(authValidator.extractToken(any())).thenReturn("token");
+    void testUpdateUser_NotAdmin() {
+        UserUpdateRequestDTO dto = new UserUpdateRequestDTO();
+        when(authValidator.extractToken(request)).thenReturn("token");
         when(authValidator.isAdmin("token")).thenReturn(false);
 
-        mockMvc.perform(patch("/admin/users/1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(updateDto)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.message").value("You are not authorized"));
+        assertThrows(UnauthorizedAccessException.class, () -> adminController.updateUser(1L, dto, request));
     }
 
-    // ================= DELETE USER =================
     @Test
-    void deleteUser_ShouldReturnNoContent_WhenAdmin() throws Exception {
-        when(authValidator.extractToken(any())).thenReturn("token");
+    void testDeleteUser_Admin() {
+        when(authValidator.extractToken(request)).thenReturn("token");
         when(authValidator.isAdmin("token")).thenReturn(true);
 
-        mockMvc.perform(delete("/admin/users/1"))
-                .andExpect(status().isNoContent());
+        var response = adminController.deleteUser(1L, request);
 
-        verify(userService, times(1)).deleteUserByAdmin(1L);
+        assertEquals(204, response.getStatusCodeValue());
+        verify(userService).deleteUserByAdmin(1L, "token");
     }
 
     @Test
-    void deleteUser_ShouldReturnForbidden_WhenNotAdmin() throws Exception {
-        when(authValidator.extractToken(any())).thenReturn("token");
+    void testDeleteUser_NotAdmin() {
+        when(authValidator.extractToken(request)).thenReturn("token");
         when(authValidator.isAdmin("token")).thenReturn(false);
 
-        mockMvc.perform(delete("/admin/users/1"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.message").value("You are not authorized"));
+        assertThrows(UnauthorizedAccessException.class, () -> adminController.deleteUser(1L, request));
+        verify(userService, never()).deleteUserByAdmin(anyLong(), anyString());
+    }
 
-        verify(userService, never()).deleteUserByAdmin(1L);
+    @Test
+    void testGetUserById_UserNotFound() {
+        when(authValidator.extractToken(request)).thenReturn("token");
+        when(authValidator.isAdmin("token")).thenReturn(true);
+        when(userService.getUserById(999L)).thenThrow(new UserNotFoundException("User not found"));
+
+        assertThrows(UserNotFoundException.class, () -> adminController.getUserById(999L, request));
+    }
+
+    @Test
+    void testUpdateUser_UserNotFound() {
+        UserUpdateRequestDTO dto = new UserUpdateRequestDTO();
+        when(authValidator.extractToken(request)).thenReturn("token");
+        when(authValidator.isAdmin("token")).thenReturn(true);
+        when(userService.updateUserByAdmin(999L, dto)).thenThrow(new UserNotFoundException("User not found"));
+
+        assertThrows(UserNotFoundException.class, () -> adminController.updateUser(999L, dto, request));
     }
 }

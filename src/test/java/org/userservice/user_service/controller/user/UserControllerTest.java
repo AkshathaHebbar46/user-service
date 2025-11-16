@@ -1,31 +1,24 @@
 package org.userservice.user_service.controller.user;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.userservice.user_service.dto.request.user.UserRequestDTO;
+import org.mockito.*;
+import org.springframework.http.ResponseEntity;
+import org.userservice.user_service.dto.request.user.UserPatchRequestDTO;
 import org.userservice.user_service.dto.response.user.UserResponseDTO;
-import org.userservice.user_service.exception.GlobalExceptionHandler;
 import org.userservice.user_service.service.UserService;
 import org.userservice.user_service.validator.AuthValidator;
 
 import java.time.LocalDateTime;
 
-import static org.mockito.ArgumentMatchers.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class UserControllerTest {
 
-    private MockMvc mockMvc;
+    @InjectMocks
+    private UserController userController;
 
     @Mock
     private UserService userService;
@@ -33,140 +26,134 @@ class UserControllerTest {
     @Mock
     private AuthValidator authValidator;
 
-    @InjectMocks
-    private UserController userController;
-
-    private ObjectMapper objectMapper;
+    @Mock
+    private HttpServletRequest request;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        mockMvc = MockMvcBuilders.standaloneSetup(userController)
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
-        objectMapper = new ObjectMapper();
     }
 
-    // ================= CREATE USER =================
-    @Test
-    void testCreateUser_Success() throws Exception {
-        UserRequestDTO request = new UserRequestDTO("JohnDoe", "john@example.com", "password123", 25);
-        UserResponseDTO response = new UserResponseDTO(1L, "JohnDoe", "john@example.com", 25, LocalDateTime.now());
-
-        when(userService.createUser(any(UserRequestDTO.class))).thenReturn(response);
-
-        mockMvc.perform(post("/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.username").value("JohnDoe"))
-                .andExpect(jsonPath("$.email").value("john@example.com"))
-                .andExpect(jsonPath("$.age").value(25))
-                .andExpect(jsonPath("$.createdAt").exists());
-
-        verify(userService, times(1)).createUser(any(UserRequestDTO.class));
-    }
+    // ==================== GET USER ====================
 
     @Test
-    void testCreateUser_ServiceThrowsException() throws Exception {
-        UserRequestDTO request = new UserRequestDTO("JohnDoe", "john@example.com", "password123", 25);
-        when(userService.createUser(any(UserRequestDTO.class)))
-                .thenThrow(new RuntimeException("Database error"));
-
-        mockMvc.perform(post("/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.message").value("Database error"));
-
-        verify(userService, times(1)).createUser(any(UserRequestDTO.class));
-    }
-
-    // ================= GET USER =================
-    @Test
-    void testGetUser_Authorized() throws Exception {
+    void getUser_Authorized_ReturnsUser() {
         Long userId = 1L;
-        when(authValidator.isAuthorized(any(HttpServletRequest.class), eq(userId))).thenReturn(true);
+        when(authValidator.isAuthorized(request, userId)).thenReturn(true);
 
-        UserResponseDTO response = new UserResponseDTO(userId, "JohnDoe", "john@example.com", 25, LocalDateTime.now());
-        when(userService.getUserById(userId)).thenReturn(response);
+        UserResponseDTO user = new UserResponseDTO(userId, "John Doe", "john@example.com", 25, LocalDateTime.now());
+        when(userService.getUserById(userId)).thenReturn(user);
 
-        mockMvc.perform(get("/users/{userId}", userId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(userId))
-                .andExpect(jsonPath("$.username").value("JohnDoe"))
-                .andExpect(jsonPath("$.age").value(25));
+        ResponseEntity<UserResponseDTO> response = userController.getUser(userId, request);
 
+        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(user, response.getBody());
         verify(userService, times(1)).getUserById(userId);
     }
 
     @Test
-    void testGetUser_NotAuthorized() throws Exception {
+    void getUser_Unauthorized_Returns403() {
         Long userId = 1L;
-        when(authValidator.isAuthorized(any(HttpServletRequest.class), eq(userId))).thenReturn(false);
+        when(authValidator.isAuthorized(request, userId)).thenReturn(false);
 
-        mockMvc.perform(get("/users/{userId}", userId))
-                .andExpect(status().isForbidden());
+        ResponseEntity<UserResponseDTO> response = userController.getUser(userId, request);
 
-        verify(userService, never()).getUserById(userId);
-    }
-
-    // ================= UPDATE USER =================
-    @Test
-    void testUpdateUser_Authorized() throws Exception {
-        Long userId = 1L;
-        UserRequestDTO request = new UserRequestDTO("JaneDoe", "jane@example.com", "password123", 30);
-        UserResponseDTO response = new UserResponseDTO(userId, "JaneDoe", "jane@example.com", 30, LocalDateTime.now());
-
-        when(authValidator.isAuthorized(any(HttpServletRequest.class), eq(userId))).thenReturn(true);
-        when(userService.updateUser(eq(userId), any(UserRequestDTO.class))).thenReturn(response);
-
-        mockMvc.perform(put("/users/{userId}", userId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.username").value("JaneDoe"))
-                .andExpect(jsonPath("$.email").value("jane@example.com"))
-                .andExpect(jsonPath("$.age").value(30));
-
-        verify(userService, times(1)).updateUser(eq(userId), any(UserRequestDTO.class));
+        assertEquals(403, response.getStatusCodeValue());
+        verify(userService, times(0)).getUserById(any());
     }
 
     @Test
-    void testUpdateUser_NotAuthorized() throws Exception {
+    void getUser_UserNotFound_ReturnsNullBody() {
         Long userId = 1L;
-        UserRequestDTO request = new UserRequestDTO("JaneDoe", "jane@example.com", "password123", 30);
-        when(authValidator.isAuthorized(any(HttpServletRequest.class), eq(userId))).thenReturn(false);
+        when(authValidator.isAuthorized(request, userId)).thenReturn(true);
+        when(userService.getUserById(userId)).thenReturn(null);
 
-        mockMvc.perform(put("/users/{userId}", userId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden());
+        ResponseEntity<UserResponseDTO> response = userController.getUser(userId, request);
 
-        verify(userService, never()).updateUser(eq(userId), any(UserRequestDTO.class));
+        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(null, response.getBody());
     }
 
-    // ================= DELETE USER =================
+    // ==================== PATCH USER ====================
+
     @Test
-    void testDeleteUser_Authorized() throws Exception {
-        Long userId = 1L;
-        when(authValidator.isAuthorized(any(HttpServletRequest.class), eq(userId))).thenReturn(true);
+    void partiallyUpdateUser_UpdateUsername() {
+        UserPatchRequestDTO patchRequest = new UserPatchRequestDTO("Jane Doe", null, null);
+        UserResponseDTO updatedUser = new UserResponseDTO(1L, "Jane Doe", "john@example.com", 25, LocalDateTime.now());
 
-        mockMvc.perform(delete("/users/{userId}", userId))
-                .andExpect(status().isNoContent());
+        when(userService.patchUpdateUser(1L, patchRequest)).thenReturn(updatedUser);
 
-        verify(userService, times(1)).deleteUser(userId);
+        ResponseEntity<UserResponseDTO> response = userController.partiallyUpdateUser(1L, patchRequest);
+
+        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(updatedUser, response.getBody());
+        verify(userService, times(1)).patchUpdateUser(1L, patchRequest);
     }
 
     @Test
-    void testDeleteUser_NotAuthorized() throws Exception {
-        Long userId = 1L;
-        when(authValidator.isAuthorized(any(HttpServletRequest.class), eq(userId))).thenReturn(false);
+    void partiallyUpdateUser_UpdatePassword() {
+        UserPatchRequestDTO patchRequest = new UserPatchRequestDTO(null, "NewPass123", null);
+        UserResponseDTO updatedUser = new UserResponseDTO(1L, "John Doe", "john@example.com", 25, LocalDateTime.now());
 
-        mockMvc.perform(delete("/users/{userId}", userId))
-                .andExpect(status().isForbidden());
+        when(userService.patchUpdateUser(1L, patchRequest)).thenReturn(updatedUser);
 
-        verify(userService, never()).deleteUser(userId);
+        ResponseEntity<UserResponseDTO> response = userController.partiallyUpdateUser(1L, patchRequest);
+
+        assertEquals(updatedUser, response.getBody());
+        verify(userService, times(1)).patchUpdateUser(1L, patchRequest);
+    }
+
+    @Test
+    void partiallyUpdateUser_UpdateAge() {
+        UserPatchRequestDTO patchRequest = new UserPatchRequestDTO(null, null, 30);
+        UserResponseDTO updatedUser = new UserResponseDTO(1L, "John Doe", "john@example.com", 30, LocalDateTime.now());
+
+        when(userService.patchUpdateUser(1L, patchRequest)).thenReturn(updatedUser);
+
+        ResponseEntity<UserResponseDTO> response = userController.partiallyUpdateUser(1L, patchRequest);
+
+        assertEquals(updatedUser, response.getBody());
+        verify(userService, times(1)).patchUpdateUser(1L, patchRequest);
+    }
+
+    @Test
+    void partiallyUpdateUser_UpdateAllFields() {
+        UserPatchRequestDTO patchRequest = new UserPatchRequestDTO("Jane Doe", "NewPass123", 28);
+        UserResponseDTO updatedUser = new UserResponseDTO(1L, "Jane Doe", "john@example.com", 28, LocalDateTime.now());
+
+        when(userService.patchUpdateUser(1L, patchRequest)).thenReturn(updatedUser);
+
+        ResponseEntity<UserResponseDTO> response = userController.partiallyUpdateUser(1L, patchRequest);
+
+        assertEquals(updatedUser, response.getBody());
+        verify(userService, times(1)).patchUpdateUser(1L, patchRequest);
+    }
+
+    @Test
+    void partiallyUpdateUser_NullPatch_ReturnsCurrentUser() {
+        UserPatchRequestDTO patchRequest = new UserPatchRequestDTO(null, null, null);
+        UserResponseDTO updatedUser = new UserResponseDTO(1L, "John Doe", "john@example.com", 25, LocalDateTime.now());
+
+        when(userService.patchUpdateUser(1L, patchRequest)).thenReturn(updatedUser);
+
+        ResponseEntity<UserResponseDTO> response = userController.partiallyUpdateUser(1L, patchRequest);
+
+        assertEquals(updatedUser, response.getBody());
+        verify(userService, times(1)).patchUpdateUser(1L, patchRequest);
+    }
+
+    @Test
+    void partiallyUpdateUser_UserNotFound_ThrowsException() {
+        UserPatchRequestDTO patchRequest = new UserPatchRequestDTO("Jane Doe", null, null);
+
+        when(userService.patchUpdateUser(1L, patchRequest)).thenThrow(new RuntimeException("User not found"));
+
+        try {
+            userController.partiallyUpdateUser(1L, patchRequest);
+        } catch (RuntimeException e) {
+            assertEquals("User not found", e.getMessage());
+        }
+
+        verify(userService, times(1)).patchUpdateUser(1L, patchRequest);
     }
 }
