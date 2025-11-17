@@ -98,3 +98,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 }
+
+//Authentication Manager is a functional interface
+//Provider Manager is a concrete class which implements this interface
+//It has various providers like
+//                DaoAuthenticationProvider,
+//                AnonymousAuthenticationProvider,
+//                RememberMeAuthenticationProvider etc.
+//So when Spring Security creates a UsernamePasswordAuthenticationToken, DaoAuthenticationProvider is chosen and it calls the CustomUserDetailsService → loadUserByUsername(email) to load the email id from the database.
+//Then the bcrypted password from the database is verified with the password from the client request.
+//If both of them matches then the request is proceeded further else bad credentials.
