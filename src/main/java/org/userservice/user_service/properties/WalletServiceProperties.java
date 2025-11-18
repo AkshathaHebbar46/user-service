@@ -7,16 +7,7 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "service.wallet")
 public class WalletServiceProperties {
 
-    private String baseUrl;
     private String adminUrl;
-
-    public String getBaseUrl() {
-        return baseUrl;
-    }
-
-    public void setBaseUrl(String baseUrl) {
-        this.baseUrl = baseUrl;
-    }
 
     public String getAdminUrl() {
         return adminUrl;

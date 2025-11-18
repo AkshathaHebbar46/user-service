@@ -1,12 +1,13 @@
 package org.userservice.user_service.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.userservice.user_service.entity.UserEntity;
 
 import java.util.List;
 import java.util.Optional;
 
-public interface UserRepository extends JpaRepository<UserEntity, Long> {
+public interface UserRepository extends JpaRepository<UserEntity, Long>, JpaSpecificationExecutor<UserEntity> {
 
     // Custom query method to find a user by email
     Optional<UserEntity> findByEmail(String email);

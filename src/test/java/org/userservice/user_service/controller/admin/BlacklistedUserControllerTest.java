@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class BlacklistedControllerTest {
+class BlacklistedUserControllerTest {
 
     @Mock
     private BlacklistedUserService blacklistedUserService;

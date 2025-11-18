@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.userservice.user_service.dto.request.user.UserUpdateRequestDTO;
@@ -15,8 +16,6 @@ import org.userservice.user_service.dto.response.user.UserResponseDTO;
 import org.userservice.user_service.exception.UnauthorizedAccessException;
 import org.userservice.user_service.validator.AuthValidator;
 import org.userservice.user_service.service.UserService;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/admin/users")
@@ -32,27 +31,40 @@ public class AdminController {
         this.authValidator = authValidator;
     }
 
-    /** Get all users */
-    @Operation(summary = "Get all users", description = "Retrieve a list of all registered users (admin only).")
+    /** Get all users with pagination and filtering */
+    @Operation(summary = "Get all users", description = "Retrieve a paginated and filtered list of users (admin only).")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successfully retrieved list of users",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = UserResponseDTO.class))),
-            @ApiResponse(responseCode = "403", description = "Unauthorized access",
-                    content = @Content)
+            @ApiResponse(responseCode = "403", description = "Unauthorized access", content = @Content)
     })
     @GetMapping
-    public ResponseEntity<List<UserResponseDTO>> getAllUsers(HttpServletRequest request) {
+    public ResponseEntity<Page<UserResponseDTO>> getAllUsers(
+            HttpServletRequest request,
+
+            // filtering
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) Boolean active,
+            @RequestParam(required = false) String role,
+
+            // pagination
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
         String token = authValidator.extractToken(request);
         if (!authValidator.isAdmin(token)) {
-            logger.warn("Unauthorized attempt to access all users");
             throw new UnauthorizedAccessException("You are not authorized to access this resource");
         }
 
-        List<UserResponseDTO> users = userService.getAllUsers();
-        logger.info("Admin retrieved {} users", users.size());
+        Page<UserResponseDTO> users = userService.getUsers(
+                username, email, active, role, page, size
+        );
+
         return ResponseEntity.ok(users);
     }
+
 
     /** Get a single user by ID */
     @Operation(summary = "Get user by ID", description = "Retrieve a single user's details by their ID (admin only).")

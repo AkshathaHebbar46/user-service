@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.userservice.user_service.config.JwtUtil;
+import org.userservice.user_service.util.JwtUtil;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;

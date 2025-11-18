@@ -11,9 +11,13 @@ public class AuthResponseDTO {
     @Schema(description = "Role of the authenticated user", example = "USER", required = true)
     private String role;
 
-    public AuthResponseDTO(String token, String role) {
+    @Schema(description = "ID of the authenticated user", example = "44", required = true)
+    private Long userId;
+
+    public AuthResponseDTO(String token, String role, Long userId) {
         this.token = token;
         this.role = role;
+        this.userId = userId;
     }
 
     public String getRole() {
@@ -26,6 +30,14 @@ public class AuthResponseDTO {
 
     public String getToken() {
         return token;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
 
     public void setToken(String token) {

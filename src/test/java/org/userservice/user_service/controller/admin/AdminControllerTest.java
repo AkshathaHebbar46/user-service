@@ -6,6 +6,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.userservice.user_service.dto.request.user.UserUpdateRequestDTO;
 import org.userservice.user_service.dto.response.user.UserResponseDTO;
 import org.userservice.user_service.exception.UnauthorizedAccessException;
@@ -46,12 +48,14 @@ class AdminControllerTest {
     void testGetAllUsers_Admin() {
         when(authValidator.extractToken(request)).thenReturn("token");
         when(authValidator.isAdmin("token")).thenReturn(true);
-        when(userService.getAllUsers()).thenReturn(List.of(user));
 
-        var response = adminController.getAllUsers(request);
+        Page<UserResponseDTO> page = new PageImpl<>(List.of(user));
+        when(userService.getUsers(null, null, null, null, 0, 10)).thenReturn(page);
 
-        assertEquals(1, response.getBody().size());
-        verify(userService).getAllUsers();
+        var response = adminController.getAllUsers(request, null, null, null, null, 0, 10);
+
+        assertEquals(1, response.getBody().getContent().size());
+        verify(userService).getUsers(null, null, null, null, 0, 10);
     }
 
     @Test
@@ -59,8 +63,9 @@ class AdminControllerTest {
         when(authValidator.extractToken(request)).thenReturn("token");
         when(authValidator.isAdmin("token")).thenReturn(false);
 
-        assertThrows(UnauthorizedAccessException.class, () -> adminController.getAllUsers(request));
-        verify(userService, never()).getAllUsers();
+        assertThrows(UnauthorizedAccessException.class,
+                () -> adminController.getAllUsers(request, null, null, null, null, 0, 10));
+        verify(userService, never()).getUsers(any(), any(), any(), any(), anyInt(), anyInt());
     }
 
     @Test

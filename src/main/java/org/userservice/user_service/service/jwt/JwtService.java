@@ -1,11 +1,10 @@
 package org.userservice.user_service.service.jwt;
 
-import io.jsonwebtoken.Claims;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
-import org.userservice.user_service.config.JwtUtil;
+import org.userservice.user_service.util.JwtUtil;
 
 @Service
 public class JwtService {

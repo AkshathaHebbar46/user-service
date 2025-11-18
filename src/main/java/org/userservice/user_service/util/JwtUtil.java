@@ -1,4 +1,4 @@
-package org.userservice.user_service.config;
+package org.userservice.user_service.util;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
