@@ -9,8 +9,6 @@ import org.springframework.http.ResponseEntity;
 import org.userservice.user_service.dto.request.login.AuthRequestDTO;
 import org.userservice.user_service.dto.request.register.RegisterRequestDTO;
 import org.userservice.user_service.dto.response.auth.AuthResponseDTO;
-import org.userservice.user_service.entity.Role;
-import org.userservice.user_service.entity.UserEntity;
 import org.userservice.user_service.service.UserService;
 import org.userservice.user_service.service.user_details.CustomUserDetailsService;
 import org.userservice.user_service.service.jwt.JwtService;

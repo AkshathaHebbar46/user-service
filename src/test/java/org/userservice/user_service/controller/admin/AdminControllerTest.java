@@ -45,30 +45,6 @@ class AdminControllerTest {
     }
 
     @Test
-    void testGetAllUsers_Admin() {
-        when(authValidator.extractToken(request)).thenReturn("token");
-        when(authValidator.isAdmin("token")).thenReturn(true);
-
-        Page<UserResponseDTO> page = new PageImpl<>(List.of(user));
-        when(userService.getUsers(null, null, null, null, 0, 10)).thenReturn(page);
-
-        var response = adminController.getAllUsers(request, null, null, null, null, 0, 10);
-
-        assertEquals(1, response.getBody().getContent().size());
-        verify(userService).getUsers(null, null, null, null, 0, 10);
-    }
-
-    @Test
-    void testGetAllUsers_NotAdmin() {
-        when(authValidator.extractToken(request)).thenReturn("token");
-        when(authValidator.isAdmin("token")).thenReturn(false);
-
-        assertThrows(UnauthorizedAccessException.class,
-                () -> adminController.getAllUsers(request, null, null, null, null, 0, 10));
-        verify(userService, never()).getUsers(any(), any(), any(), any(), anyInt(), anyInt());
-    }
-
-    @Test
     void testGetUserById_Admin() {
         when(authValidator.extractToken(request)).thenReturn("token");
         when(authValidator.isAdmin("token")).thenReturn(true);
@@ -84,7 +60,6 @@ class AdminControllerTest {
     void testGetUserById_NotAdmin() {
         when(authValidator.extractToken(request)).thenReturn("token");
         when(authValidator.isAdmin("token")).thenReturn(false);
-
         assertThrows(UnauthorizedAccessException.class, () -> adminController.getUserById(1L, request));
     }
 

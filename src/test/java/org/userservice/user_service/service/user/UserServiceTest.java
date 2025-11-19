@@ -14,7 +14,6 @@ import org.userservice.user_service.mapper.UserMapper;
 import org.userservice.user_service.properties.WalletServiceProperties;
 import org.userservice.user_service.repository.UserRepository;
 import org.userservice.user_service.service.UserService;
-import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.*;

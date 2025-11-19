@@ -25,11 +25,6 @@ class BlacklistedUserControllerTest {
     private final Long existingUserId = 1L;
     private final Long nonExistingUserId = 999L;
 
-    @BeforeEach
-    void setup() {
-        // Can initialize common setup here if needed
-    }
-
     // --- Blacklist User ---
 
     @Test
