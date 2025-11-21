@@ -41,25 +41,6 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }
 
-    @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ErrorResponseDTO> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
-        String message = "Duplicate entry or constraint violation";
-        if (ex.getMessage() != null && ex.getMessage().contains("users.UK6dotkott2kjsp8vw4d0m25fb7")) {
-            message = "A user with this email already exists.";
-        }
-
-        logger.error("Data integrity violation: {}", message, ex);
-
-        ErrorResponseDTO error = new ErrorResponseDTO(
-                LocalDateTime.now(),
-                HttpStatus.CONFLICT.value(),
-                "Data Integrity Violation",
-                message
-        );
-
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
-    }
-
     @ExceptionHandler(WalletServiceException.class)
     public ResponseEntity<ErrorResponseDTO> handleWalletServiceError(WalletServiceException ex) {
         logger.error("Wallet service error: {}", ex.getMessage(), ex);

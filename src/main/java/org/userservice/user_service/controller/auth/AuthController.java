@@ -10,21 +10,11 @@ import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.userservice.user_service.dto.request.login.AuthRequestDTO;
 import org.userservice.user_service.dto.request.register.RegisterRequestDTO;
 import org.userservice.user_service.dto.response.auth.AuthResponseDTO;
-import org.userservice.user_service.entity.Role;
-import org.userservice.user_service.entity.UserEntity;
-import org.userservice.user_service.repository.UserRepository;
 import org.userservice.user_service.service.UserService;
-import org.userservice.user_service.service.jwt.JwtService;
-import org.userservice.user_service.service.user_details.CustomUserDetailsService;
-
-import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -34,18 +24,9 @@ public class AuthController {
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
 
     private final UserService userService;
-    private final CustomUserDetailsService userDetailsService;
-    private final JwtService jwtService;
-    private final AuthenticationManager authenticationManager;
 
-    public AuthController(UserService userService,
-                          CustomUserDetailsService userDetailsService,
-                          JwtService jwtService,
-                          AuthenticationManager authenticationManager) {
+    public AuthController(UserService userService) {
         this.userService = userService;
-        this.userDetailsService = userDetailsService;
-        this.jwtService = jwtService;
-        this.authenticationManager = authenticationManager;
     }
 
     @Operation(

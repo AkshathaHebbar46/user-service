@@ -218,7 +218,6 @@ public class UserService {
     // ---------------------------------------------------------------------------
     // REGISTER USER (PUBLIC)
     // ---------------------------------------------------------------------------
-    @Transactional
     public void registerUser(RegisterRequestDTO request) {
 
         logger.info("Register attempt for email={}", request.getEmail());
@@ -246,17 +245,24 @@ public class UserService {
 
     public AuthResponseDTO login(AuthRequestDTO request) {
 
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
-
+        // 1. Find user first
         UserEntity user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
+        // 2. Check if active BEFORE authentication
         if (Boolean.FALSE.equals(user.getActive())) {
             throw new IllegalStateException("User account is inactive or blacklisted.");
         }
 
+        // 3. Authenticate password
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        request.getEmail(),
+                        request.getPassword()
+                )
+        );
+
+        // 4. Generate JWT
         String token = jwtService.generateToken(
                 user.getEmail(),
                 user.getId(),
@@ -297,6 +303,4 @@ public class UserService {
                 user.getCreatedAt()
         ));
     }
-
-
 }
