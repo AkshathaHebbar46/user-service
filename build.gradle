@@ -71,6 +71,8 @@ dependencies {
     testImplementation 'org.assertj:assertj-core'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
+    implementation project(':common-utils')
+
 }
 
 tasks.named('test') {

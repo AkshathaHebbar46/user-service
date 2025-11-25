@@ -8,7 +8,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.userservice.user_service.entity.UserEntity;
@@ -24,6 +23,7 @@ import org.userservice.user_service.dto.request.user.UserUpdateRequestDTO;
 import org.userservice.user_service.dto.response.auth.AuthResponseDTO;
 import org.userservice.user_service.dto.response.user.UserResponseDTO;
 import org.userservice.user_service.entity.Role;
+import org.userservice.user_service.exception.UserAlreadyExistsException;
 import org.userservice.user_service.mapper.UserMapper;
 import org.userservice.user_service.properties.WalletServiceProperties;
 import org.userservice.user_service.repository.UserRepository;
@@ -224,7 +224,7 @@ public class UserService {
 
         if (userRepository.existsByEmail(request.getEmail())) {
             logger.warn("Registration failed: email {} already exists", request.getEmail());
-            throw new IllegalArgumentException("Email already registered");
+            throw new UserAlreadyExistsException("Email already registered");
         }
 
         UserEntity user = new UserEntity();

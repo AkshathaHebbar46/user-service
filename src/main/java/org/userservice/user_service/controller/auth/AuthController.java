@@ -36,7 +36,7 @@ public class AuthController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "User registered successfully"),
             @ApiResponse(responseCode = "400", description = "Email already registered", content = @Content),
-            @ApiResponse(responseCode = "422", description = "Validation failed", content = @Content)
+            @ApiResponse(responseCode = "400", description = "Validation failed or bad request"),
     })
     @PostMapping("/register")
     public ResponseEntity<String> register(@Valid @RequestBody RegisterRequestDTO request) {
